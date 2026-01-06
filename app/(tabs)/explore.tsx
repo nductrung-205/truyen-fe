@@ -1,112 +1,199 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  ScrollView, 
+  TouchableOpacity,
+  Image,
+  Dimensions 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+const { width } = Dimensions.get('window');
+const genreWidth = (width - 45) / 2;
 
-export default function TabTwoScreen() {
+const genres = [
+  { id: 1, name: 'Tiên Hiệp', icon: '⚔️', color: '#ff6b6b', count: 1234 },
+  { id: 2, name: 'Huyền Huyễn', icon: '✨', color: '#4834df', count: 2341 },
+  { id: 3, name: 'Đô Thị', icon: '🏙️', color: '#00d2d3', count: 987 },
+  { id: 4, name: 'Khoa Huyễn', icon: '🚀', color: '#5f27cd', count: 1567 },
+  { id: 5, name: 'Kiếm Hiệp', icon: '🗡️', color: '#ff9ff3', count: 876 },
+  { id: 6, name: 'Võng Du', icon: '🎮', color: '#48dbfb', count: 654 },
+  { id: 7, name: 'Lịch Sử', icon: '📜', color: '#feca57', count: 432 },
+  { id: 8, name: 'Quân Sự', icon: '⚔️', color: '#ee5a6f', count: 765 },
+  { id: 9, name: 'Đam Mỹ', icon: '💕', color: '#f368e0', count: 1890 },
+  { id: 10, name: 'Ngôn Tình', icon: '💖', color: '#ff6348', count: 2100 },
+];
+
+const tags = [
+  'Xuyên Không', 'Tu Tiên', 'Hệ Thống', 'Trọng Sinh', 
+  'Phản Diện', 'Vô Địch', 'Nữ Cường', 'Sủng Văn',
+  'Cung Đấu', 'Học Đường', 'Tổng Tài', 'Dị Giới'
+];
+
+export default function ExploreScreen() {
+  const router = useRouter();
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Khám phá</Text>
+        <TouchableOpacity>
+          <Ionicons name="search" size={24} color="#2d3436" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Popular Tags */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>🔥 Tags phổ biến</Text>
+        </View>
+        <View style={styles.tagsContainer}>
+          {tags.map((tag, index) => (
+            <TouchableOpacity key={index} style={styles.tagChip}>
+              <Text style={styles.tagText}>{tag}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Genres Grid */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>📚 Thể loại</Text>
+          <Text style={styles.sectionSubtitle}>Tìm truyện theo sở thích</Text>
+        </View>
+        
+        <View style={styles.genresGrid}>
+          {genres.map((genre) => (
+            <TouchableOpacity 
+              key={genre.id}
+              style={[styles.genreCard, { backgroundColor: genre.color + '15' }]}
+            >
+              <View style={[styles.genreIcon, { backgroundColor: genre.color }]}>
+                <Text style={styles.genreEmoji}>{genre.icon}</Text>
+              </View>
+              <Text style={styles.genreName}>{genre.name}</Text>
+              <Text style={styles.genreCount}>{genre.count} truyện</Text>
+              <View style={[styles.genreCorner, { backgroundColor: genre.color }]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={{ height: 30 }} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  titleContainer: {
+  
+  // Header
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingTop: 50,
+    paddingBottom: 15,
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2d3436',
+  },
+
+  // Section
+  section: {
+    marginTop: 15,
+  },
+  sectionHeader: {
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#95a5a6',
+  },
+
+  // Tags
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 15,
     gap: 8,
+  },
+  tagChip: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  tagText: {
+    fontSize: 13,
+    color: '#495057',
+    fontWeight: '500',
+  },
+
+  // Genres Grid
+  genresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 15,
+    gap: 12,
+  },
+  genreCard: {
+    width: genreWidth,
+    height: 130,
+    borderRadius: 16,
+    padding: 15,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  genreIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  genreEmoji: {
+    fontSize: 24,
+  },
+  genreName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3436',
+    marginBottom: 4,
+  },
+  genreCount: {
+    fontSize: 12,
+    color: '#636e72',
+  },
+  genreCorner: {
+    position: 'absolute',
+    bottom: -20,
+    right: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    opacity: 0.3,
   },
 });
