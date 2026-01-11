@@ -22,21 +22,37 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const showAlert = (title: string, message: string, onPress?: () => void) => {
+    if (Platform.OS === 'web') {
+      // Trên Web dùng alert mặc định của trình duyệt
+      alert(`${title}: ${message}`);
+      if (onPress) onPress();
+    } else {
+      // Trên điện thoại dùng Alert của React Native
+      Alert.alert(title, message, onPress ? [{ text: 'OK', onPress }] : []);
+    }
+  };
+
   const handleRegister = async () => {
-    // Validation
+    console.log(">>> Bắt đầu Validation...");
+
+    // 1. Kiểm tra trống
     if (!username.trim() || !email.trim() || !password || !confirmPassword) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+      console.log("Lỗi: Thiếu thông tin", { username, email });
+      showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin (Đặc biệt là Email)');
       return;
     }
 
+    // 2. Kiểm tra độ dài username
     if (username.trim().length < 3) {
-      Alert.alert('Lỗi', 'Tên đăng nhập phải có ít nhất 3 ký tự');
+      showAlert('Lỗi', 'Tên đăng nhập phải có ít nhất 3 ký tự');
       return;
     }
 
+    // 3. Kiểm tra định dạng Email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
+      showAlert('Lỗi', 'Email không hợp lệ');
       return;
     }
 
@@ -52,21 +68,20 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
+      console.log(">>> Đang gửi request lên Server...");
       const response = await authService.register({
         username: username.trim(),
         email: email.trim(),
         password,
       });
 
-      Alert.alert('Thành công', 'Đăng ký thành công! Vui lòng đăng nhập.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      showAlert('Thành công', 'Đăng ký thành công! Vui lòng đăng nhập.', () => {
+        router.back();
+      });
     } catch (error: any) {
       console.error('Register error:', error);
-      Alert.alert(
-        'Đăng ký thất bại',
-        error.response?.data || 'Có lỗi xảy ra. Vui lòng thử lại.'
-      );
+      const errorMsg = error.response?.data || 'Có lỗi xảy ra. Vui lòng thử lại.';
+      showAlert('Đăng ký thất bại', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -112,7 +127,7 @@ export default function RegisterScreen() {
               <Text style={styles.label}>Email *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="example@email.com"
+                placeholder=""
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"

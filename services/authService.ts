@@ -26,10 +26,15 @@ export const authService = {
 
   // Đăng xuất
   logout: async () => {
-    await AsyncStorage.removeItem(USER_KEY);
-    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+    try {
+      await AsyncStorage.removeItem('@user'); // Key bạn dùng để lưu thông tin user
+      await AsyncStorage.removeItem('@auth_token'); // Xóa token nếu có
+      console.log("Đã xóa dữ liệu user trong Storage");
+    } catch (error) {
+      console.error('Lỗi khi đăng xuất:', error);
+    }
   },
-
+  
   // Lưu user vào storage
   saveUser: async (user: AuthResponse) => {
     try {

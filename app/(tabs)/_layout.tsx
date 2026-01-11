@@ -2,13 +2,23 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, Platform } from 'react-native';
 
+/**
+ * TabLayout: Cấu hình thanh điều hướng phía dưới (Bottom Tab Bar)
+ * 
+ * Chiến lược: 
+ * - Không thực hiện redirect (chuyển hướng) bắt buộc ở đây.
+ * - Cho phép người dùng truy cập tự do vào các tab public (Trang chủ, Khám phá, BXH).
+ * - Các tab yêu cầu cá nhân hóa (Tủ sách, Tôi) sẽ tự kiểm tra trạng thái login 
+ *   bằng logic có sẵn trong file của màn hình đó.
+ */
+
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#ff6b6b',
-        tabBarInactiveTintColor: '#95a5a6',
+        tabBarActiveTintColor: '#ff6b6b', // Màu đỏ san hô khi được chọn
+        tabBarInactiveTintColor: '#95a5a6', // Màu xám khi không chọn
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 88 : 65,
           paddingBottom: Platform.OS === 'ios' ? 25 : 10,
@@ -32,7 +42,7 @@ export default function TabLayout() {
         },
       }}
     >
-      {/* Trang chủ */}
+      {/* 1. Trang chủ - Công khai */}
       <Tabs.Screen
         name="index"
         options={{
@@ -49,7 +59,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Khám phá / Thể loại */}
+      {/* 2. Khám phá / Thể loại - Công khai */}
       <Tabs.Screen
         name="explore"
         options={{
@@ -66,7 +76,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Bảng xếp hạng */}
+      {/* 3. Bảng xếp hạng - Công khai */}
       <Tabs.Screen
         name="ranking"
         options={{
@@ -83,7 +93,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Tủ sách */}
+      {/* 4. Tủ sách - Yêu cầu login (Kiểm tra trong library.tsx) */}
       <Tabs.Screen
         name="library"
         options={{
@@ -100,7 +110,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Cá nhân */}
+      {/* 5. Cá nhân - Yêu cầu login (Kiểm tra trong profile.tsx) */}
       <Tabs.Screen
         name="profile"
         options={{
@@ -125,5 +135,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffe3e3',
     borderRadius: 12,
     padding: 8,
+    // Căn giữa icon trong container màu hồng nhạt
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
