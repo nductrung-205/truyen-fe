@@ -1,180 +1,289 @@
-import React from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
   TouchableOpacity,
   Image,
-  Switch
+  Alert,
+  Switch,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { storageService } from '@/services/storageService';
+import { authService } from '@/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { UserProfile } from '@/types/auth';
+
+interface UserStats {
+  totalRead: number;
+  totalFavorites: number;
+  totalChapters: number;
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [darkMode, setDarkMode] = React.useState(false);
-  const [notifications, setNotifications] = React.useState(true);
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalRead: 0,
+    totalFavorites: 0,
+    totalChapters: 0,
+  });
+  const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState(true);
 
-  const MenuItem = ({ icon, title, subtitle, onPress, rightElement }: any) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <View style={styles.menuIcon}>
-        <Ionicons name={icon} size={22} color="#ff6b6b" />
-      </View>
-      <View style={styles.menuContent}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
-      </View>
-      {rightElement || <Ionicons name="chevron-forward" size={20} color="#b2bec3" />}
-    </TouchableOpacity>
-  );
+  useEffect(() => {
+    loadUserStats();
+    loadSettings();
+  }, []);
+
+  const loadUserStats = async () => {
+    try {
+      const history = await storageService.getReadingHistory();
+      const favorites = await storageService.getFavorites();
+      
+      // Tính tổng số chapter đã đọc
+      const totalChapters = history.reduce((sum, item) => sum + item.lastReadChapter, 0);
+
+      setUserStats({
+        totalRead: history.length,
+        totalFavorites: favorites.length,
+        totalChapters,
+      });
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const darkModeSetting = await AsyncStorage.getItem('@dark_mode');
+      const notificationsSetting = await AsyncStorage.getItem('@notifications');
+      
+      if (darkModeSetting !== null) {
+        setDarkMode(darkModeSetting === 'true');
+      }
+      if (notificationsSetting !== null) {
+        setNotifications(notificationsSetting === 'true');
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleDarkModeToggle = async (value: boolean) => {
+    setDarkMode(value);
+    await AsyncStorage.setItem('@dark_mode', value.toString());
+    // TODO: Apply dark mode theme
+    Alert.alert('Thông báo', 'Chế độ tối sẽ được áp dụng trong phiên bản tiếp theo');
+  };
+
+  const handleNotificationsToggle = async (value: boolean) => {
+    setNotifications(value);
+    await AsyncStorage.setItem('@notifications', value.toString());
+  };
+
+  const handleClearCache = () => {
+    Alert.alert(
+      'Xóa bộ nhớ cache',
+      'Bạn có chắc muốn xóa toàn bộ dữ liệu cache?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            // TODO: Clear image cache, etc.
+            Alert.alert('Thành công', 'Đã xóa bộ nhớ cache');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllData = () => {
+    Alert.alert(
+      '⚠️ Xóa toàn bộ dữ liệu',
+      'Điều này sẽ xóa lịch sử đọc, yêu thích và tất cả cài đặt. Bạn có chắc chắn?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa tất cả',
+          style: 'destructive',
+          onPress: async () => {
+            await storageService.clearReadingHistory();
+            await AsyncStorage.clear();
+            loadUserStats();
+            Alert.alert('Thành công', 'Đã xóa toàn bộ dữ liệu');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAbout = () => {
+    Alert.alert(
+      'Về ứng dụng',
+      'Truyện Hay v1.0.0\n\nỨng dụng đọc truyện miễn phí\n\n© 2025 Truyện Hay',
+      [{ text: 'OK' }]
+    );
+  };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cá nhân</Text>
-        <TouchableOpacity>
-          <Ionicons name="settings-outline" size={24} color="#2d3436" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Profile Card */}
-      <View style={styles.profileCard}>
-        <TouchableOpacity style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: 'https://via.placeholder.com/100' }}
+        <View style={styles.avatarContainer}>
+          <Image
+            source={{ uri: 'https://i.pravatar.cc/150?img=68' }}
             style={styles.avatar}
           />
           <View style={styles.editBadge}>
-            <Ionicons name="camera" size={16} color="#fff" />
-          </View>
-        </TouchableOpacity>
-        
-        <View style={styles.profileInfo}>
-          <Text style={styles.userName}>Người dùng</Text>
-          <Text style={styles.userEmail}>user@example.com</Text>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>24</Text>
-              <Text style={styles.statLabel}>Đang đọc</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>156</Text>
-              <Text style={styles.statLabel}>Đã đọc</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>89</Text>
-              <Text style={styles.statLabel}>Yêu thích</Text>
-            </View>
+            <Text style={styles.editIcon}>✏️</Text>
           </View>
         </View>
+        <Text style={styles.username}>Người dùng</Text>
+        <Text style={styles.email}>user@example.com</Text>
+      </View>
 
-        <TouchableOpacity style={styles.vipButton}>
-          <Ionicons name="diamond" size={18} color="#ffd700" />
-          <Text style={styles.vipText}>Nâng cấp VIP</Text>
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{userStats.totalRead}</Text>
+          <Text style={styles.statLabel}>Đã đọc</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{userStats.totalFavorites}</Text>
+          <Text style={styles.statLabel}>Yêu thích</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{userStats.totalChapters}</Text>
+          <Text style={styles.statLabel}>Chương</Text>
+        </View>
+      </View>
+
+      {/* Reading Settings */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>📖 Cài đặt đọc truyện</Text>
+        
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>🔤</Text>
+          <Text style={styles.menuText}>Cỡ chữ</Text>
+          <View style={styles.menuBadge}>
+            <Text style={styles.menuBadgeText}>Trung bình</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.menuItem}>
+          <Text style={styles.menuIcon}>🌙</Text>
+          <Text style={styles.menuText}>Chế độ tối</Text>
+          <Switch
+            value={darkMode}
+            onValueChange={handleDarkModeToggle}
+            trackColor={{ false: '#E0E0E0', true: '#81C784' }}
+            thumbColor={darkMode ? '#4CAF50' : '#f4f3f4'}
+          />
+        </View>
+
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>📱</Text>
+          <Text style={styles.menuText}>Hướng đọc</Text>
+          <View style={styles.menuBadge}>
+            <Text style={styles.menuBadgeText}>Dọc</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
       </View>
 
-      {/* My Content */}
+      {/* App Settings */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Nội dung của tôi</Text>
+        <Text style={styles.sectionTitle}>⚙️ Cài đặt ứng dụng</Text>
         
-        <MenuItem 
-          icon="book-outline"
-          title="Tủ sách của tôi"
-          subtitle="24 truyện"
-          onPress={() => router.push('/(tabs)/library')}
-        />
-        <MenuItem 
-          icon="heart-outline"
-          title="Yêu thích"
-          subtitle="89 truyện"
-        />
-        <MenuItem 
-          icon="time-outline"
-          title="Lịch sử đọc"
-          subtitle="156 truyện"
-        />
-        <MenuItem 
-          icon="download-outline"
-          title="Tải về"
-          subtitle="12 truyện"
-        />
+        <View style={styles.menuItem}>
+          <Text style={styles.menuIcon}>🔔</Text>
+          <Text style={styles.menuText}>Thông báo</Text>
+          <Switch
+            value={notifications}
+            onValueChange={handleNotificationsToggle}
+            trackColor={{ false: '#E0E0E0', true: '#81C784' }}
+            thumbColor={notifications ? '#4CAF50' : '#f4f3f4'}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleClearCache}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>🗑️</Text>
+          <Text style={styles.menuText}>Xóa bộ nhớ cache</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleClearAllData}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>⚠️</Text>
+          <Text style={[styles.menuText, { color: '#D32F2F' }]}>
+            Xóa toàn bộ dữ liệu
+          </Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Settings */}
+      {/* Other */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cài đặt</Text>
+        <Text style={styles.sectionTitle}>📋 Khác</Text>
         
-        <MenuItem 
-          icon="moon-outline"
-          title="Chế độ tối"
-          rightElement={
-            <Switch 
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: '#dfe6e9', true: '#ff6b6b' }}
-              thumbColor="#fff"
-            />
-          }
-        />
-        <MenuItem 
-          icon="notifications-outline"
-          title="Thông báo"
-          rightElement={
-            <Switch 
-              value={notifications}
-              onValueChange={setNotifications}
-              trackColor={{ false: '#dfe6e9', true: '#ff6b6b' }}
-              thumbColor="#fff"
-            />
-          }
-        />
-        <MenuItem 
-          icon="text-outline"
-          title="Cài đặt đọc"
-          subtitle="Font chữ, màu nền, cỡ chữ"
-        />
-        <MenuItem 
-          icon="language-outline"
-          title="Ngôn ngữ"
-          subtitle="Tiếng Việt"
-        />
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>⭐</Text>
+          <Text style={styles.menuText}>Đánh giá ứng dụng</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>💬</Text>
+          <Text style={styles.menuText}>Phản hồi</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>📄</Text>
+          <Text style={styles.menuText}>Điều khoản sử dụng</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+          <Text style={styles.menuIcon}>🔒</Text>
+          <Text style={styles.menuText}>Chính sách bảo mật</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleAbout}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.menuIcon}>ℹ️</Text>
+          <Text style={styles.menuText}>Về ứng dụng</Text>
+          <View style={styles.menuBadge}>
+            <Text style={styles.menuBadgeText}>v1.0.0</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Others */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Khác</Text>
-        
-        <MenuItem 
-          icon="help-circle-outline"
-          title="Trợ giúp & Phản hồi"
-        />
-        <MenuItem 
-          icon="document-text-outline"
-          title="Điều khoản sử dụng"
-        />
-        <MenuItem 
-          icon="shield-checkmark-outline"
-          title="Chính sách bảo mật"
-        />
-        <MenuItem 
-          icon="information-circle-outline"
-          title="Về chúng tôi"
-        />
-      </View>
-
-      {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton}>
-        <Ionicons name="log-out-outline" size={20} color="#e74c3c" />
-        <Text style={styles.logoutText}>Đăng xuất</Text>
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutButton} activeOpacity={0.7}>
+        <Text style={styles.logoutText}>🚪 Đăng xuất</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 30 }} />
+      {/* Bottom Spacing */}
+      <View style={styles.bottomSpacing} />
     </ScrollView>
   );
 }
@@ -182,173 +291,147 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
   },
-  
-  // Header
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingTop: 50,
-    paddingBottom: 15,
-    backgroundColor: '#fff',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2d3436',
-  },
-
-  // Profile Card
-  profileCard: {
-    backgroundColor: '#fff',
-    margin: 15,
-    padding: 20,
-    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    paddingTop: 60,
+    paddingBottom: 32,
     alignItems: 'center',
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#e9ecef',
+    borderWidth: 4,
+    borderColor: '#fff',
   },
   editBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
+    backgroundColor: '#fff',
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#ff6b6b',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
-  profileInfo: {
-    alignItems: 'center',
-    marginBottom: 20,
+  editIcon: {
+    fontSize: 14,
   },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2d3436',
+  username: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
     marginBottom: 4,
   },
-  userEmail: {
+  email: {
     fontSize: 14,
-    color: '#636e72',
-    marginBottom: 15,
+    color: '#E8F5E9',
   },
-  statsRow: {
+  statsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
+    backgroundColor: '#fff',
+    marginTop: -16,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2d3436',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#636e72',
-    marginTop: 4,
+    fontSize: 13,
+    color: '#666',
   },
   statDivider: {
     width: 1,
-    height: 30,
-    backgroundColor: '#e9ecef',
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
   },
-  vipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff9e6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#ffe066',
-  },
-  vipText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f59f00',
-  },
-
-  // Section
   section: {
+    marginTop: 16,
     backgroundColor: '#fff',
-    marginTop: 10,
-    paddingVertical: 10,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    overflow: 'hidden',
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#95a5a6',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    textTransform: 'uppercase',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    padding: 16,
+    paddingBottom: 12,
   },
-
-  // Menu Item
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f2f6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F5',
   },
   menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fff5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 20,
     marginRight: 12,
+    width: 24,
+    textAlign: 'center',
   },
-  menuContent: {
+  menuText: {
     flex: 1,
-  },
-  menuTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#2d3436',
-    marginBottom: 2,
+    color: '#333',
   },
-  menuSubtitle: {
-    fontSize: 13,
-    color: '#95a5a6',
-  },
-
-  // Logout
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginTop: 20,
-    paddingVertical: 15,
+  menuBadge: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
-    gap: 8,
+    marginRight: 8,
+  },
+  menuBadgeText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  menuArrow: {
+    fontSize: 20,
+    color: '#ccc',
+  },
+  logoutButton: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFEBEE',
   },
   logoutText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#e74c3c',
+    color: '#D32F2F',
+  },
+  bottomSpacing: {
+    height: 32,
   },
 });

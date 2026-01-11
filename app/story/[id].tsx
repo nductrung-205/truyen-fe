@@ -1,214 +1,275 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  Image, 
-  ScrollView, 
-  TouchableOpacity, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  Alert,
   ActivityIndicator,
-  Dimensions 
 } from 'react-native';
-import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
-
-interface Story {
-  id: number;
-  title: string;
-  thumbnail_url: string;
-  description: string;
-  status: string;
-  author?: string;
-  views?: number;
-  rating?: number;
-}
-
-interface Chapter {
-  id: number;
-  story_id: number;
-  chapter_number: number;
-  title: string;
-  created_at: string;
-}
+import { storyService } from '@/services/storyService';
+import { chapterService } from '@/services/chapterService';
+import { storageService, ReadingHistoryItem } from '@/services/storageService';
+import { StoryDetail, Chapter } from '@/types';
+import { ChapterItem } from '@/components/ChapterItem';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function StoryDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [story, setStory] = useState<Story | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [story, setStory] = useState<StoryDetail | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
-
-  const API_URL = "http://localhost:8080/api";
+  const [lastReadChapter, setLastReadChapter] = useState<number | null>(null);
+  const [showAllChapters, setShowAllChapters] = useState(false);
 
   useEffect(() => {
-    // Lấy thông tin truyện
-    axios.get(`${API_URL}/stories/${id}`)
-      .then(response => {
-        setStory(response.data);
-      })
-      .catch(error => console.error("Lỗi tải truyện:", error));
-
-    // Lấy danh sách chapter
-    axios.get(`${API_URL}/stories/${id}/chapters`)
-      .then(response => {
-        setChapters(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error("Lỗi tải chapters:", error);
-        setLoading(false);
-      });
+    if (id) {
+      loadStoryDetail();
+    }
   }, [id]);
 
-  const handleReadFirst = () => {
-    if (chapters.length > 0) {
-      router.push({ 
-        pathname: "/chapter/[id]", 
-        params: { id: chapters[0].id } 
-      });
+  const loadStoryDetail = async () => {
+    try {
+      setLoading(true);
+      const storyId = parseInt(id);
+
+      // Load story detail và chapters song song
+      const [storyRes, chaptersRes] = await Promise.all([
+        storyService.getStoryDetail(storyId),
+        chapterService.getChapters(storyId),
+      ]);
+
+      setStory(storyRes.data);
+      setChapters(chaptersRes.data);
+
+      // Check favorite status
+      const favoriteStatus = await storageService.isFavorite(storyId);
+      setIsFavorite(favoriteStatus);
+
+      // Get last read chapter
+      const progress = await storageService.getReadingProgress(storyId);
+      setLastReadChapter(progress?.chapterNumber || null);
+    } catch (error) {
+      console.error('Error loading story detail:', error);
+      Alert.alert('Lỗi', 'Không thể tải thông tin truyện');
+      router.back();
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleReadLatest = () => {
-    if (chapters.length > 0) {
-      router.push({ 
-        pathname: "/chapter/[id]", 
-        params: { id: chapters[chapters.length - 1].id } 
-      });
+  const handleToggleFavorite = async () => {
+    if (!story) return;
+
+    try {
+      if (isFavorite) {
+        await storageService.removeFromFavorites(story.id);
+        setIsFavorite(false);
+        Alert.alert('Thành công', 'Đã xóa khỏi yêu thích');
+      } else {
+        await storageService.addToFavorites(story.id);
+        setIsFavorite(true);
+        Alert.alert('Thành công', 'Đã thêm vào yêu thích');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Lỗi', 'Không thể thực hiện');
     }
   };
 
-  const handleChapterPress = (chapterId: number) => {
-    router.push({ pathname: "/chapter/[id]", params: { id: chapterId } });
+  const handleReadChapter = async (chapterNumber: number) => {
+    if (!story) return;
+
+    // Save to reading history
+    const historyItem: ReadingHistoryItem = {
+      storyId: story.id,
+      storyTitle: story.title,
+      thumbnailUrl: story.thumbnailUrl,
+      authorName: story.authorName,
+      lastReadChapter: chapterNumber,
+      lastReadAt: new Date().toISOString(),
+    };
+    await storageService.addToReadingHistory(historyItem);
+
+    // Navigate to chapter
+    router.push(`/chapter/${story.id}/${chapterNumber}`);
   };
 
-  if (loading || !story) {
+  const handleReadFromStart = () => {
+    if (chapters.length > 0) {
+      handleReadChapter(chapters[0].chapterNumber);
+    }
+  };
+
+  const handleContinueReading = () => {
+    if (lastReadChapter) {
+      handleReadChapter(lastReadChapter);
+    } else {
+      handleReadFromStart();
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner text="Đang tải..." />;
+  }
+
+  if (!story) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#ff4757" />
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Không tìm thấy truyện</Text>
       </View>
     );
   }
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header với nút Back */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
-          <Ionicons 
-            name={isFavorite ? "heart" : "heart-outline"} 
-            size={24} 
-            color="#ff4757" 
-          />
-        </TouchableOpacity>
-      </View>
+  const displayedChapters = showAllChapters ? chapters : chapters.slice(0, 10);
 
-      {/* Thumbnail và Info */}
-      <View style={styles.topSection}>
-        <Image 
-          source={{ uri: story.thumbnail_url }} 
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-        
-        <View style={styles.infoSection}>
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        {/* Cover Image */}
+        <View style={styles.coverContainer}>
+          <Image
+            source={{ uri: story.thumbnailUrl }}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+          <View style={styles.coverOverlay} />
+          
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>‹</Text>
+          </TouchableOpacity>
+
+          {/* Favorite Button */}
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={handleToggleFavorite}
+          >
+            <Text style={styles.favoriteIcon}>
+              {isFavorite ? '❤️' : '🤍'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Story Info */}
+        <View style={styles.infoContainer}>
           <Text style={styles.title}>{story.title}</Text>
           
           <View style={styles.metaRow}>
-            <View style={styles.statusBadge}>
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>✍️</Text>
+              <Text style={styles.metaText}>{story.authorName}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>👁</Text>
+              <Text style={styles.metaText}>
+                {formatNumber(story.views)} lượt xem
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>⭐</Text>
+              <Text style={styles.metaText}>{story.rating?.toFixed(1) || 0}/5.0</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Text style={styles.metaIcon}>📖</Text>
+              <Text style={styles.metaText}>{story.chaptersCount} chương</Text>
+            </View>
+            <View style={[styles.statusBadge, story.status === 'Hoàn thành' && styles.statusBadgeComplete]}>
               <Text style={styles.statusText}>{story.status}</Text>
             </View>
-            {story.rating && (
-              <View style={styles.ratingBox}>
-                <Ionicons name="star" size={14} color="#f39c12" />
-                <Text style={styles.ratingText}>{story.rating.toFixed(1)}</Text>
-              </View>
+          </View>
+
+          {/* Categories */}
+          {story.categoryNames && story.categoryNames.length > 0 && (
+            <View style={styles.categoriesContainer}>
+              {Array.from(story.categoryNames).map((category, index) => (
+                <View key={index} style={styles.categoryChip}>
+                  <Text style={styles.categoryText}>{category}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Description */}
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.sectionTitle}>📝 Giới thiệu</Text>
+            <Text style={styles.description}>{story.description}</Text>
+          </View>
+        </View>
+
+        {/* Chapters List */}
+        <View style={styles.chaptersContainer}>
+          <View style={styles.chaptersHeader}>
+            <Text style={styles.sectionTitle}>
+              📚 Danh sách chương ({chapters.length})
+            </Text>
+            {lastReadChapter && (
+              <Text style={styles.lastReadText}>
+                Đọc đến chương {lastReadChapter}
+              </Text>
             )}
           </View>
 
-          {story.author && (
-            <Text style={styles.author}>Tác giả: {story.author}</Text>
-          )}
-          
-          {story.views && (
-            <Text style={styles.views}>
-              <Ionicons name="eye-outline" size={14} /> {story.views.toLocaleString()} lượt xem
-            </Text>
+          {displayedChapters.map((chapter) => (
+            <ChapterItem
+              key={chapter.id}
+              chapter={chapter}
+              onPress={() => handleReadChapter(chapter.chapterNumber)}
+            />
+          ))}
+
+          {chapters.length > 10 && !showAllChapters && (
+            <TouchableOpacity
+              style={styles.showMoreButton}
+              onPress={() => setShowAllChapters(true)}
+            >
+              <Text style={styles.showMoreText}>
+                Xem thêm {chapters.length - 10} chương →
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[styles.button, styles.primaryButton]} 
-          onPress={handleReadFirst}
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+
+      {/* Bottom Action Buttons */}
+      <View style={styles.bottomActions}>
+        <TouchableOpacity
+          style={styles.readButton}
+          onPress={handleReadFromStart}
         >
-          <Ionicons name="play" size={18} color="#fff" />
-          <Text style={styles.buttonText}>Đọc từ đầu</Text>
+          <Text style={styles.readButtonText}>📖 Đọc từ đầu</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.button, styles.secondaryButton]}
-          onPress={handleReadLatest}
+        
+        <TouchableOpacity
+          style={[styles.readButton, styles.continueButton]}
+          onPress={handleContinueReading}
         >
-          <Ionicons name="flash" size={18} color="#ff4757" />
-          <Text style={styles.buttonTextSecondary}>Đọc mới nhất</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Description */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Giới thiệu</Text>
-        <Text style={styles.description}>{story.description}</Text>
-      </View>
-
-      {/* Chapter List */}
-      <View style={styles.section}>
-        <View style={styles.chapterHeader}>
-          <Text style={styles.sectionTitle}>
-            Danh sách chương ({chapters.length})
+          <Text style={styles.readButtonText}>
+            {lastReadChapter ? '▶️ Đọc tiếp' : '▶️ Bắt đầu đọc'}
           </Text>
-          <TouchableOpacity>
-            <Ionicons name="filter" size={20} color="#999" />
-          </TouchableOpacity>
-        </View>
-
-        {chapters.map((chapter, index) => (
-          <TouchableOpacity 
-            key={chapter.id}
-            style={styles.chapterItem}
-            onPress={() => handleChapterPress(chapter.id)}
-          >
-            <View style={styles.chapterLeft}>
-              <Text style={styles.chapterNumber}>
-                Chapter {chapter.chapter_number}
-              </Text>
-              <Text style={styles.chapterTitle} numberOfLines={1}>
-                {chapter.title}
-              </Text>
-            </View>
-            
-            <View style={styles.chapterRight}>
-              <Text style={styles.chapterDate}>
-                {new Date(chapter.created_at).toLocaleDateString('vi-VN')}
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
-            </View>
-          </TouchableOpacity>
-        ))}
+        </TouchableOpacity>
       </View>
-
-      <View style={{ height: 30 }} />
-    </ScrollView>
+    </View>
   );
+}
+
+function formatNumber(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
 }
 
 const styles = StyleSheet.create({
@@ -216,188 +277,184 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  center: {
+  scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    paddingTop: 50,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  coverContainer: {
+    height: 300,
+    position: 'relative',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Top Section
-  topSection: {
-    flexDirection: 'row',
-    padding: 15,
-    paddingTop: 90,
-    backgroundColor: '#f8f9fa',
+  backButtonText: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '300',
   },
-  thumbnail: {
-    width: 120,
-    height: 160,
-    borderRadius: 8,
-    backgroundColor: '#e0e0e0',
-  },
-  infoSection: {
-    flex: 1,
-    marginLeft: 15,
+  favoriteButton: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favoriteIcon: {
+    fontSize: 20,
+  },
+  infoContainer: {
+    padding: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2d3436',
-    marginBottom: 10,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    flexWrap: 'wrap',
   },
-  statusBadge: {
-    backgroundColor: '#ff4757',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  ratingBox: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  ratingText: {
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2d3436',
-  },
-  author: {
-    fontSize: 13,
-    color: '#636e72',
+    marginRight: 16,
     marginBottom: 4,
   },
-  views: {
+  metaIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  metaText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  statusBadge: {
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeComplete: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusText: {
     fontSize: 12,
-    color: '#b2bec3',
-  },
-
-  // Action Buttons
-  actionButtons: {
-    flexDirection: 'row',
-    padding: 15,
-    gap: 10,
-  },
-  button: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  primaryButton: {
-    backgroundColor: '#ff4757',
-  },
-  secondaryButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#ff4757',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 15,
     fontWeight: '600',
+    color: '#FF9800',
   },
-  buttonTextSecondary: {
-    color: '#ff4757',
-    fontSize: 15,
-    fontWeight: '600',
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    marginBottom: 16,
   },
-
-  // Sections
-  section: {
-    padding: 15,
-    borderTopWidth: 8,
-    borderTopColor: '#f8f9fa',
+  categoryChip: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 13,
+    color: '#1976D2',
+    fontWeight: '500',
+  },
+  descriptionContainer: {
+    marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#2d3436',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
     marginBottom: 12,
   },
   description: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#636e72',
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#666',
   },
-
-  // Chapter List
-  chapterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  chaptersContainer: {
+    backgroundColor: '#F8F9FA',
+    paddingTop: 16,
   },
-  chapterItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f2f6',
+  chaptersHeader: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  chapterLeft: {
-    flex: 1,
-  },
-  chapterNumber: {
+  lastReadText: {
     fontSize: 13,
-    color: '#ff4757',
-    fontWeight: '600',
-    marginBottom: 4,
+    color: '#007AFF',
+    marginTop: 4,
   },
-  chapterTitle: {
-    fontSize: 14,
-    color: '#2d3436',
-  },
-  chapterRight: {
-    flexDirection: 'row',
+  showMoreButton: {
+    padding: 16,
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#fff',
+    marginTop: 8,
   },
-  chapterDate: {
-    fontSize: 12,
-    color: '#b2bec3',
+  showMoreText: {
+    fontSize: 15,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  bottomSpacing: {
+    height: 80,
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 12,
+  },
+  readButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  continueButton: {
+    backgroundColor: '#4CAF50',
+  },
+  readButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#999',
   },
 });

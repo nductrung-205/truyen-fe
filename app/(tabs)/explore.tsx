@@ -1,199 +1,285 @@
-import React from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TextInput,
   TouchableOpacity,
-  Image,
-  Dimensions 
+  FlatList,
+  Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
-const { width } = Dimensions.get('window');
-const genreWidth = (width - 45) / 2;
-
-const genres = [
-  { id: 1, name: 'Tiên Hiệp', icon: '⚔️', color: '#ff6b6b', count: 1234 },
-  { id: 2, name: 'Huyền Huyễn', icon: '✨', color: '#4834df', count: 2341 },
-  { id: 3, name: 'Đô Thị', icon: '🏙️', color: '#00d2d3', count: 987 },
-  { id: 4, name: 'Khoa Huyễn', icon: '🚀', color: '#5f27cd', count: 1567 },
-  { id: 5, name: 'Kiếm Hiệp', icon: '🗡️', color: '#ff9ff3', count: 876 },
-  { id: 6, name: 'Võng Du', icon: '🎮', color: '#48dbfb', count: 654 },
-  { id: 7, name: 'Lịch Sử', icon: '📜', color: '#feca57', count: 432 },
-  { id: 8, name: 'Quân Sự', icon: '⚔️', color: '#ee5a6f', count: 765 },
-  { id: 9, name: 'Đam Mỹ', icon: '💕', color: '#f368e0', count: 1890 },
-  { id: 10, name: 'Ngôn Tình', icon: '💖', color: '#ff6348', count: 2100 },
-];
-
-const tags = [
-  'Xuyên Không', 'Tu Tiên', 'Hệ Thống', 'Trọng Sinh', 
-  'Phản Diện', 'Vô Địch', 'Nữ Cường', 'Sủng Văn',
-  'Cung Đấu', 'Học Đường', 'Tổng Tài', 'Dị Giới'
-];
+import { categoryService } from '@/services/categoryService';
+import { storyService } from '@/services/storyService';
+import { Category, Story } from '@/types';
+import { CategoryChip } from '@/components/CategoryChip';
+import { StoryCard } from '@/components/StoryCard';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Story[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      loadStoriesByCategory(selectedCategory);
+    }
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    // Debounce search
+    const timer = setTimeout(() => {
+      if (searchQuery.trim().length > 0) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await categoryService.getAllCategories();
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách thể loại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStoriesByCategory = async (slug: string) => {
+    try {
+      const response = await storyService.getStoriesByCategory(slug);
+      setStories(response.data);
+    } catch (error) {
+      console.error('Error loading stories by category:', error);
+      Alert.alert('Lỗi', 'Không thể tải truyện theo thể loại');
+    }
+  };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim().length === 0) return;
+
+    try {
+      setIsSearching(true);
+      const response = await storyService.searchStories(searchQuery.trim());
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error searching stories:', error);
+      Alert.alert('Lỗi', 'Không thể tìm kiếm truyện');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleCategoryPress = (category: Category) => {
+    if (selectedCategory === category.slug) {
+      setSelectedCategory(null);
+      setStories([]);
+    } else {
+      setSelectedCategory(category.slug);
+      setSearchQuery(''); // Clear search khi chọn category
+      setSearchResults([]);
+    }
+  };
+
+  const navigateToStory = (storyId: number) => {
+    router.push(`/story/${storyId}`);
+  };
+
+  const displayStories = searchQuery.trim().length > 0 ? searchResults : stories;
+
+  if (loading) {
+    return <LoadingSpinner text="Đang tải..." />;
+  }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Khám phá</Text>
-        <TouchableOpacity>
-          <Ionicons name="search" size={24} color="#2d3436" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Popular Tags */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🔥 Tags phổ biến</Text>
-        </View>
-        <View style={styles.tagsContainer}>
-          {tags.map((tag, index) => (
-            <TouchableOpacity key={index} style={styles.tagChip}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Genres Grid */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>📚 Thể loại</Text>
-          <Text style={styles.sectionSubtitle}>Tìm truyện theo sở thích</Text>
-        </View>
+        <Text style={styles.headerTitle}>🔍 Khám Phá</Text>
         
-        <View style={styles.genresGrid}>
-          {genres.map((genre) => (
-            <TouchableOpacity 
-              key={genre.id}
-              style={[styles.genreCard, { backgroundColor: genre.color + '15' }]}
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔎</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm truyện..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery('');
+                setSearchResults([]);
+              }}
+              style={styles.clearButton}
             >
-              <View style={[styles.genreIcon, { backgroundColor: genre.color }]}>
-                <Text style={styles.genreEmoji}>{genre.icon}</Text>
-              </View>
-              <Text style={styles.genreName}>{genre.name}</Text>
-              <Text style={styles.genreCount}>{genre.count} truyện</Text>
-              <View style={[styles.genreCorner, { backgroundColor: genre.color }]} />
+              <Text style={styles.clearButtonText}>✕</Text>
             </TouchableOpacity>
-          ))}
+          )}
         </View>
       </View>
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+      <ScrollView style={styles.content}>
+        {/* Categories Section */}
+        {searchQuery.trim().length === 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📚 Thể Loại</Text>
+            <View style={styles.categoriesContainer}>
+              {categories.map((category) => (
+                <CategoryChip
+                  key={category.id}
+                  category={category}
+                  onPress={() => handleCategoryPress(category)}
+                  isSelected={selectedCategory === category.slug}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Stories List */}
+        <View style={styles.section}>
+          {isSearching ? (
+            <LoadingSpinner size="small" text="Đang tìm kiếm..." />
+          ) : (
+            <>
+              {searchQuery.trim().length > 0 && (
+                <Text style={styles.sectionTitle}>
+                  🔎 Kết quả tìm kiếm {searchQuery} ({searchResults.length})
+                </Text>
+              )}
+              {selectedCategory && searchQuery.trim().length === 0 && (
+                <Text style={styles.sectionTitle}>
+                  📖 Truyện {categories.find(c => c.slug === selectedCategory)?.name} ({stories.length})
+                </Text>
+              )}
+              
+              {displayStories.length > 0 ? (
+                <View style={styles.storiesList}>
+                  {displayStories.map((story) => (
+                    <StoryCard
+                      key={story.id}
+                      story={story}
+                      onPress={() => navigateToStory(story.id)}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyIcon}>📭</Text>
+                  <Text style={styles.emptyText}>
+                    {searchQuery.trim().length > 0
+                      ? 'Không tìm thấy truyện nào'
+                      : selectedCategory
+                      ? 'Chưa có truyện trong thể loại này'
+                      : 'Chọn thể loại để xem truyện'}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F9FA',
   },
-  
-  // Header
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingTop: 50,
-    paddingBottom: 15,
     backgroundColor: '#fff',
+    paddingTop: 60,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2d3436',
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 16,
   },
-
-  // Section
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearButtonText: {
+    fontSize: 18,
+    color: '#999',
+  },
+  content: {
+    flex: 1,
+  },
   section: {
-    marginTop: 15,
-  },
-  sectionHeader: {
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    marginTop: 16,
+    backgroundColor: '#fff',
+    padding: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2d3436',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#95a5a6',
-  },
-
-  // Tags
-  tagsContainer: {
+  categoriesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 15,
-    gap: 8,
   },
-  tagChip: {
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+  storiesList: {
+    marginTop: 8,
   },
-  tagText: {
-    fontSize: 13,
-    color: '#495057',
-    fontWeight: '500',
-  },
-
-  // Genres Grid
-  genresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 15,
-    gap: 12,
-  },
-  genreCard: {
-    width: genreWidth,
-    height: 130,
-    borderRadius: 16,
-    padding: 15,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  genreIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+  emptyContainer: {
     alignItems: 'center',
-    marginBottom: 10,
+    paddingVertical: 40,
   },
-  genreEmoji: {
-    fontSize: 24,
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
   },
-  genreName: {
+  emptyText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2d3436',
-    marginBottom: 4,
-  },
-  genreCount: {
-    fontSize: 12,
-    color: '#636e72',
-  },
-  genreCorner: {
-    position: 'absolute',
-    bottom: -20,
-    right: -20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    opacity: 0.3,
+    color: '#999',
+    textAlign: 'center',
   },
 });

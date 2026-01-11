@@ -1,417 +1,466 @@
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
   TouchableOpacity,
+  Alert,
+  RefreshControl,
   Image,
-  FlatList,
-  Dimensions 
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { storageService, ReadingHistoryItem } from '@/services/storageService';
+import { storyService } from '@/services/storyService';
+import { Story } from '@/types';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { StoryCard } from '@/components/StoryCard';
 
-const { width } = Dimensions.get('window');
-const cardWidth = (width - 45) / 3;
-
-// Mock data
-const favoriteStories = [
-  {
-    id: 1,
-    title: 'Tái Sinh Thành Hoàng Tử',
-    thumbnail_url: 'https://via.placeholder.com/150',
-    lastRead: 'Chapter 45',
-    progress: 45,
-  },
-  {
-    id: 2,
-    title: 'Tu Tiên Trong Đô Thị',
-    thumbnail_url: 'https://via.placeholder.com/150',
-    lastRead: 'Chapter 23',
-    progress: 23,
-  },
-  {
-    id: 3,
-    title: 'Hệ Thống Vô Địch',
-    thumbnail_url: 'https://via.placeholder.com/150',
-    lastRead: 'Chapter 67',
-    progress: 67,
-  },
-];
-
-const readingHistory = [
-  {
-    id: 4,
-    title: 'Kiếm Đạo Độc Tôn',
-    thumbnail_url: 'https://via.placeholder.com/150',
-    lastRead: 'Chapter 12',
-    readAt: '2 giờ trước',
-  },
-  {
-    id: 5,
-    title: 'Linh Vũ Thiên Hạ',
-    thumbnail_url: 'https://via.placeholder.com/150',
-    lastRead: 'Chapter 89',
-    readAt: 'Hôm qua',
-  },
-];
+type TabType = 'history' | 'favorites';
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState<'reading' | 'history' | 'downloaded'>('reading');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<TabType>('history');
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>([]);
+  const [favoriteStories, setFavoriteStories] = useState<Story[]>([]);
 
-  const renderStoryCard = (item: any) => (
-    <TouchableOpacity 
-      style={styles.storyCard}
-      onPress={() => router.push({ pathname: "/story/[id]", params: { id: item.id } })}
-    >
-      <Image 
-        source={{ uri: item.thumbnail_url }} 
-        style={styles.cardImage}
-      />
-      <View style={styles.cardOverlay}>
-        <Ionicons name="play-circle" size={32} color="rgba(255,255,255,0.9)" />
-      </View>
-      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-      <Text style={styles.cardChapter}>{item.lastRead}</Text>
-      {item.progress && (
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${(item.progress / 100) * 100}%` }]} />
-        </View>
-      )}
-    </TouchableOpacity>
+  // Load data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
   );
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        loadReadingHistory(),
+        loadFavorites(),
+      ]);
+    } catch (error) {
+      console.error('Error loading library data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadReadingHistory = async () => {
+    const history = await storageService.getReadingHistory();
+    setReadingHistory(history);
+  };
+
+  const loadFavorites = async () => {
+    try {
+      const favoriteIds = await storageService.getFavorites();
+      
+      if (favoriteIds.length === 0) {
+        setFavoriteStories([]);
+        return;
+      }
+
+      // Load story details for each favorite
+      const storyPromises = favoriteIds.map(id => 
+        storyService.getStoryDetail(id).catch(() => null)
+      );
+      
+      const results = await Promise.all(storyPromises);
+      const stories = results.filter(result => result !== null).map(result => result!.data);
+      setFavoriteStories(stories);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  const handleRemoveHistory = (storyId: number) => {
+    Alert.alert(
+      'Xóa lịch sử',
+      'Bạn có chắc muốn xóa truyện này khỏi lịch sử đọc?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            await storageService.removeFromReadingHistory(storyId);
+            await loadReadingHistory();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      'Xóa toàn bộ lịch sử',
+      'Bạn có chắc muốn xóa toàn bộ lịch sử đọc?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa tất cả',
+          style: 'destructive',
+          onPress: async () => {
+            await storageService.clearReadingHistory();
+            await loadReadingHistory();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveFavorite = async (storyId: number) => {
+    await storageService.removeFromFavorites(storyId);
+    await loadFavorites();
+  };
+
+  const navigateToStory = (storyId: number) => {
+    router.push(`/story/${storyId}`);
+  };
+
+  const navigateToChapter = (storyId: number, chapterNumber: number) => {
+    router.push(`/chapter/${storyId}/${chapterNumber}`);
+  };
+
+  if (loading) {
+    return <LoadingSpinner text="Đang tải..." />;
+  }
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tủ sách</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="search" size={22} color="#2d3436" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="settings-outline" size={22} color="#2d3436" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Ionicons name="book" size={24} color="#ff6b6b" />
-          <Text style={styles.statNumber}>24</Text>
-          <Text style={styles.statLabel}>Đang đọc</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="time" size={24} color="#4834df" />
-          <Text style={styles.statNumber}>156</Text>
-          <Text style={styles.statLabel}>Lịch sử</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="download" size={24} color="#00d2d3" />
-          <Text style={styles.statNumber}>12</Text>
-          <Text style={styles.statLabel}>Đã tải</Text>
-        </View>
+        <Text style={styles.headerTitle}>📚 Thư Viện</Text>
+        <Text style={styles.headerSubtitle}>Truyện của bạn</Text>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={[styles.tab, selectedTab === 'reading' && styles.tabActive]}
-          onPress={() => setSelectedTab('reading')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'reading' && styles.tabTextActive]}>
-            Đang đọc
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
           style={[styles.tab, selectedTab === 'history' && styles.tabActive]}
           onPress={() => setSelectedTab('history')}
+          activeOpacity={0.7}
         >
           <Text style={[styles.tabText, selectedTab === 'history' && styles.tabTextActive]}>
-            Lịch sử
+            🕒 Đã đọc ({readingHistory.length})
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, selectedTab === 'downloaded' && styles.tabActive]}
-          onPress={() => setSelectedTab('downloaded')}
+
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'favorites' && styles.tabActive]}
+          onPress={() => setSelectedTab('favorites')}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, selectedTab === 'downloaded' && styles.tabTextActive]}>
-            Đã tải
+          <Text style={[styles.tabText, selectedTab === 'favorites' && styles.tabTextActive]}>
+            ❤️ Yêu thích ({favoriteStories.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Content */}
-      {selectedTab === 'reading' && (
-        <View style={styles.content}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tiếp tục đọc</Text>
-            <TouchableOpacity>
-              <Ionicons name="swap-vertical" size={20} color="#636e72" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.storiesGrid}>
-            {favoriteStories.map((story) => (
-              <View key={story.id}>
-                {renderStoryCard(story)}
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {selectedTab === 'history' && (
-        <View style={styles.content}>
-          {readingHistory.map((story) => (
-            <TouchableOpacity 
-              key={story.id}
-              style={styles.historyItem}
-              onPress={() => router.push({ pathname: "/story/[id]", params: { id: story.id } })}
-            >
-              <Image 
-                source={{ uri: story.thumbnail_url }} 
-                style={styles.historyImage}
-              />
-              <View style={styles.historyInfo}>
-                <Text style={styles.historyTitle} numberOfLines={2}>
-                  {story.title}
-                </Text>
-                <Text style={styles.historyChapter}>{story.lastRead}</Text>
-                <Text style={styles.historyTime}>
-                  <Ionicons name="time-outline" size={12} /> {story.readAt}
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.historyAction}>
-                <Ionicons name="close-circle" size={24} color="#dfe6e9" />
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {selectedTab === 'history' ? (
+          <View style={styles.section}>
+            {/* Clear History Button */}
+            {readingHistory.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={handleClearHistory}
+              >
+                <Text style={styles.clearButtonText}>🗑️ Xóa tất cả</Text>
               </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+            )}
 
-      {selectedTab === 'downloaded' && (
-        <View style={styles.emptyState}>
-          <Ionicons name="cloud-download-outline" size={80} color="#dfe6e9" />
-          <Text style={styles.emptyText}>Chưa có truyện tải về</Text>
-          <Text style={styles.emptySubtext}>
-            Tải truyện về để đọc offline
-          </Text>
-        </View>
-      )}
+            {/* Reading History List */}
+            {readingHistory.length > 0 ? (
+              readingHistory.map((item) => (
+                <View key={item.storyId} style={styles.historyItem}>
+                  <TouchableOpacity
+                    style={styles.historyContent}
+                    onPress={() => navigateToStory(item.storyId)}
+                    activeOpacity={0.7}
+                  >
+                    <Image
+                      source={{ uri: item.thumbnailUrl }}
+                      style={styles.historyThumbnail}
+                    />
+                    <View style={styles.historyInfo}>
+                      <Text style={styles.historyTitle} numberOfLines={2}>
+                        {item.storyTitle}
+                      </Text>
+                      <Text style={styles.historyAuthor}>{item.authorName}</Text>
+                      <Text style={styles.historyChapter}>
+                        📖 Đọc đến chương {item.lastReadChapter}
+                      </Text>
+                      <Text style={styles.historyDate}>
+                        {formatDate(item.lastReadAt)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+                  <View style={styles.historyActions}>
+                    <TouchableOpacity
+                      style={styles.continueButton}
+                      onPress={() => navigateToChapter(item.storyId, item.lastReadChapter)}
+                    >
+                      <Text style={styles.continueButtonText}>Đọc tiếp</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveHistory(item.storyId)}
+                    >
+                      <Text style={styles.removeButtonText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>📖</Text>
+                <Text style={styles.emptyText}>Chưa có lịch sử đọc</Text>
+                <Text style={styles.emptySubtext}>
+                  Bắt đầu đọc truyện để xem lịch sử ở đây
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.section}>
+            {/* Favorites List */}
+            {favoriteStories.length > 0 ? (
+              favoriteStories.map((story) => (
+                <View key={story.id} style={styles.favoriteItem}>
+                  <StoryCard
+                    story={story}
+                    onPress={() => navigateToStory(story.id)}
+                  />
+                  <TouchableOpacity
+                    style={styles.unfavoriteButton}
+                    onPress={() => handleRemoveFavorite(story.id)}
+                  >
+                    <Text style={styles.unfavoriteText}>💔 Bỏ thích</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>❤️</Text>
+                <Text style={styles.emptyText}>Chưa có truyện yêu thích</Text>
+                <Text style={styles.emptySubtext}>
+                  Thêm truyện vào yêu thích để xem ở đây
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) {
+    return `${diffMins} phút trước`;
+  } else if (diffHours < 24) {
+    return `${diffHours} giờ trước`;
+  } else if (diffDays < 7) {
+    return `${diffDays} ngày trước`;
+  } else {
+    return date.toLocaleDateString('vi-VN');
+  }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F9FA',
   },
-  
-  // Header
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingTop: 50,
-    paddingBottom: 15,
+    backgroundColor: '#9C27B0',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 24,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2d3436',
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
   },
-  headerActions: {
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#F3E5F5',
+  },
+  tabContainer: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Stats
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    gap: 12,
-    marginBottom: 15,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2d3436',
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#636e72',
-    marginTop: 4,
-  },
-
-  // Tabs
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    gap: 10,
-    marginBottom: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 16,
     alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#ff6b6b',
+    borderBottomColor: '#9C27B0',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#636e72',
+    color: '#999',
   },
   tabTextActive: {
-    color: '#fff',
+    color: '#9C27B0',
   },
-
-  // Content
   content: {
-    paddingHorizontal: 15,
+    flex: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+  section: {
+    padding: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2d3436',
-  },
-
-  // Stories Grid
-  storiesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  storyCard: {
-    width: cardWidth,
-  },
-  cardImage: {
-    width: '100%',
-    height: cardWidth * 1.4,
+  clearButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFEBEE',
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    marginBottom: 16,
   },
-  cardOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: cardWidth * 1.4 - cardWidth * 1.4 + 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 8,
-  },
-  cardTitle: {
-    fontSize: 13,
+  clearButtonText: {
+    color: '#D32F2F',
     fontWeight: '600',
-    color: '#2d3436',
-    marginTop: 8,
-    lineHeight: 18,
+    fontSize: 14,
   },
-  cardChapter: {
-    fontSize: 11,
-    color: '#b2bec3',
-    marginTop: 4,
-  },
-  progressBar: {
-    height: 3,
-    backgroundColor: '#e9ecef',
-    borderRadius: 2,
-    marginTop: 6,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#ff6b6b',
-  },
-
-  // History List
   historyItem: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f2f6',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  historyImage: {
-    width: 60,
-    height: 80,
-    borderRadius: 6,
+  historyContent: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  historyThumbnail: {
+    width: 80,
+    height: 110,
+    borderRadius: 8,
     backgroundColor: '#f0f0f0',
   },
   historyInfo: {
     flex: 1,
     marginLeft: 12,
-    justifyContent: 'center',
   },
   historyTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#2d3436',
+    color: '#333',
+    marginBottom: 4,
+  },
+  historyAuthor: {
+    fontSize: 13,
+    color: '#666',
     marginBottom: 6,
   },
   historyChapter: {
     fontSize: 13,
-    color: '#636e72',
+    color: '#007AFF',
+    fontWeight: '500',
     marginBottom: 4,
   },
-  historyTime: {
+  historyDate: {
     fontSize: 12,
-    color: '#b2bec3',
+    color: '#999',
   },
-  historyAction: {
+  historyActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  continueButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  continueButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  removeButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    alignItems: 'center',
   },
-
-  // Empty State
-  emptyState: {
+  removeButtonText: {
+    fontSize: 18,
+    color: '#D32F2F',
+  },
+  favoriteItem: {
+    marginBottom: 12,
+  },
+  unfavoriteButton: {
+    marginTop: 8,
+    paddingVertical: 10,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  unfavoriteText: {
+    color: '#D32F2F',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#636e72',
-    marginTop: 20,
+    color: '#666',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#b2bec3',
-    marginTop: 8,
+    color: '#999',
+    textAlign: 'center',
   },
 });

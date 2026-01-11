@@ -7,6 +7,7 @@ export interface Story {
   authorName: string;
   categoryNames: string[];
   views: number;
+  rating?: number; // Optional vì không phải lúc nào cũng có
   chaptersCount: number;
 }
 
