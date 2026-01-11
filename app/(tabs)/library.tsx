@@ -18,11 +18,16 @@ import { Story } from '@/types';
 import { UserProfile } from '@/types/auth';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StoryCard } from '@/components/StoryCard';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 
 type TabType = 'history' | 'favorites';
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const { activeTheme } = useTheme();
+  const colors = Colors[activeTheme];
+  
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +35,6 @@ export default function LibraryScreen() {
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>([]);
   const [favoriteStories, setFavoriteStories] = useState<Story[]>([]);
 
-  // Kiểm tra trạng thái đăng nhập mỗi khi người dùng quay lại tab này
   useFocusEffect(
     useCallback(() => {
       checkAuthAndLoad();
@@ -44,7 +48,6 @@ export default function LibraryScreen() {
       setUser(storedUser);
       
       if (storedUser) {
-        // Chỉ tải dữ liệu nếu đã đăng nhập
         await Promise.all([
           loadReadingHistory(),
           loadFavorites(),
@@ -88,33 +91,33 @@ export default function LibraryScreen() {
 
   const handleRemoveHistory = (storyId: number) => {
     const performRemove = async () => {
-        await storageService.removeFromReadingHistory(storyId);
-        await loadReadingHistory();
+      await storageService.removeFromReadingHistory(storyId);
+      await loadReadingHistory();
     };
 
     if (Platform.OS === 'web') {
-        if (window.confirm("Xóa truyện này khỏi lịch sử?")) performRemove();
+      if (window.confirm("Xóa truyện này khỏi lịch sử?")) performRemove();
     } else {
-        Alert.alert('Xóa lịch sử', 'Bạn có chắc chắn?', [
-            { text: 'Hủy', style: 'cancel' },
-            { text: 'Xóa', style: 'destructive', onPress: performRemove },
-        ]);
+      Alert.alert('Xóa lịch sử', 'Bạn có chắc chắn?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: performRemove },
+      ]);
     }
   };
 
   const handleClearHistory = () => {
     const performClear = async () => {
-        await storageService.clearReadingHistory();
-        await loadReadingHistory();
+      await storageService.clearReadingHistory();
+      await loadReadingHistory();
     };
 
     if (Platform.OS === 'web') {
-        if (window.confirm("Xóa toàn bộ lịch sử đọc?")) performClear();
+      if (window.confirm("Xóa toàn bộ lịch sử đọc?")) performClear();
     } else {
-        Alert.alert('Xóa tất cả', 'Bạn có chắc chắn?', [
-            { text: 'Hủy', style: 'cancel' },
-            { text: 'Xóa tất cả', style: 'destructive', onPress: performClear },
-        ]);
+      Alert.alert('Xóa tất cả', 'Bạn có chắc chắn?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa tất cả', style: 'destructive', onPress: performClear },
+      ]);
     }
   };
 
@@ -127,17 +130,18 @@ export default function LibraryScreen() {
     return <LoadingSpinner text="Đang tải..." />;
   }
 
-  // GIAO DIỆN KHI CHƯA ĐĂNG NHẬP
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { backgroundColor: '#673AB7' }]}>
           <Text style={styles.headerTitle}>📚 Thư Viện</Text>
         </View>
         <View style={styles.notLoggedInContainer}>
           <Text style={styles.emptyIcon}>👤</Text>
-          <Text style={styles.notLoggedInTitle}>Chưa đăng nhập</Text>
-          <Text style={styles.notLoggedInText}>
+          <Text style={[styles.notLoggedInTitle, { color: colors.text }]}>
+            Chưa đăng nhập
+          </Text>
+          <Text style={[styles.notLoggedInText, { color: colors.textSecondary }]}>
             Đăng nhập để xem lịch sử đọc và danh sách truyện yêu thích của bạn.
           </Text>
           <TouchableOpacity
@@ -151,20 +155,22 @@ export default function LibraryScreen() {
     );
   }
 
-  // GIAO DIỆN KHI ĐÃ ĐĂNG NHẬP
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>📚 Thư Viện</Text>
         <Text style={styles.headerSubtitle}>Tủ sách của {user.username}</Text>
       </View>
 
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'history' && styles.tabActive]}
           onPress={() => setSelectedTab('history')}
         >
-          <Text style={[styles.tabText, selectedTab === 'history' && styles.tabTextActive]}>
+          <Text style={[
+            styles.tabText, 
+            { color: selectedTab === 'history' ? '#9C27B0' : colors.textSecondary }
+          ]}>
             🕒 Đã đọc ({readingHistory.length})
           </Text>
         </TouchableOpacity>
@@ -173,7 +179,10 @@ export default function LibraryScreen() {
           style={[styles.tab, selectedTab === 'favorites' && styles.tabActive]}
           onPress={() => setSelectedTab('favorites')}
         >
-          <Text style={[styles.tabText, selectedTab === 'favorites' && styles.tabTextActive]}>
+          <Text style={[
+            styles.tabText,
+            { color: selectedTab === 'favorites' ? '#9C27B0' : colors.textSecondary }
+          ]}>
             ❤️ Yêu thích ({favoriteStories.length})
           </Text>
         </TouchableOpacity>
@@ -186,37 +195,54 @@ export default function LibraryScreen() {
         {selectedTab === 'history' ? (
           <View style={styles.section}>
             {readingHistory.length > 0 && (
-              <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
-                <Text style={styles.clearButtonText}>🗑️ Xóa tất cả</Text>
+              <TouchableOpacity 
+                style={[styles.clearButton, { backgroundColor: colors.dangerLight }]} 
+                onPress={handleClearHistory}
+              >
+                <Text style={[styles.clearButtonText, { color: colors.danger }]}>
+                  🗑️ Xóa tất cả
+                </Text>
               </TouchableOpacity>
             )}
 
             {readingHistory.length > 0 ? (
               readingHistory.map((item) => (
-                <View key={item.storyId} style={styles.historyItem}>
-                  <TouchableOpacity style={styles.historyContent} onPress={() => router.push(`/story/${item.storyId}`)}>
+                <View key={item.storyId} style={[styles.historyItem, { backgroundColor: colors.card }]}>
+                  <TouchableOpacity 
+                    style={styles.historyContent} 
+                    onPress={() => router.push(`/story/${item.storyId}`)}
+                  >
                     <Image source={{ uri: item.thumbnailUrl }} style={styles.historyThumbnail} />
                     <View style={styles.historyInfo}>
-                      <Text style={styles.historyTitle} numberOfLines={2}>{item.storyTitle}</Text>
-                      <Text style={styles.historyChapter}>Chương {item.lastReadChapter}</Text>
-                      <Text style={styles.historyDate}>{formatDate(item.lastReadAt)}</Text>
+                      <Text style={[styles.historyTitle, { color: colors.text }]} numberOfLines={2}>
+                        {item.storyTitle}
+                      </Text>
+                      <Text style={[styles.historyChapter, { color: colors.blue }]}>
+                        Chương {item.lastReadChapter}
+                      </Text>
+                      <Text style={[styles.historyDate, { color: colors.textSecondary }]}>
+                        {formatDate(item.lastReadAt)}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                   <View style={styles.historyActions}>
                     <TouchableOpacity 
-                        style={styles.continueButton} 
-                        onPress={() => router.push(`/chapter/${item.storyId}/${item.lastReadChapter}`)}
+                      style={[styles.continueButton, { backgroundColor: colors.blue }]} 
+                      onPress={() => router.push(`/chapter/${item.storyId}/${item.lastReadChapter}`)}
                     >
                       <Text style={styles.continueButtonText}>Đọc tiếp</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.removeButton} onPress={() => handleRemoveHistory(item.storyId)}>
-                      <Text style={styles.removeButtonText}>✕</Text>
+                    <TouchableOpacity 
+                      style={[styles.removeButton, { backgroundColor: colors.dangerLight }]} 
+                      onPress={() => handleRemoveHistory(item.storyId)}
+                    >
+                      <Text style={[styles.removeButtonText, { color: colors.danger }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ))
             ) : (
-              <RenderEmpty icon="📖" text="Chưa có lịch sử đọc" />
+              <RenderEmpty icon="📖" text="Chưa có lịch sử đọc" colors={colors} />
             )}
           </View>
         ) : (
@@ -225,13 +251,18 @@ export default function LibraryScreen() {
               favoriteStories.map((story) => (
                 <View key={story.id} style={styles.favoriteItem}>
                   <StoryCard story={story} onPress={() => router.push(`/story/${story.id}`)} />
-                  <TouchableOpacity style={styles.unfavoriteButton} onPress={() => handleRemoveFavorite(story.id)}>
-                    <Text style={styles.unfavoriteText}>💔 Bỏ thích</Text>
+                  <TouchableOpacity 
+                    style={[styles.unfavoriteButton, { backgroundColor: colors.dangerLight }]} 
+                    onPress={() => handleRemoveFavorite(story.id)}
+                  >
+                    <Text style={[styles.unfavoriteText, { color: colors.danger }]}>
+                      💔 Bỏ thích
+                    </Text>
                   </TouchableOpacity>
                 </View>
               ))
             ) : (
-              <RenderEmpty icon="❤️" text="Chưa có truyện yêu thích" />
+              <RenderEmpty icon="❤️" text="Chưa có truyện yêu thích" colors={colors} />
             )}
           </View>
         )}
@@ -240,53 +271,52 @@ export default function LibraryScreen() {
   );
 }
 
-const RenderEmpty = ({ icon, text }: { icon: string, text: string }) => (
+const RenderEmpty = ({ icon, text, colors }: { icon: string, text: string, colors: any }) => (
   <View style={styles.emptyContainer}>
     <Text style={styles.emptyIcon}>{icon}</Text>
-    <Text style={styles.emptyText}>{text}</Text>
+    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{text}</Text>
   </View>
 );
 
 function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN');
+  const date = new Date(dateString);
+  return date.toLocaleDateString('vi-VN');
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1 },
   header: { backgroundColor: '#9C27B0', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 24 },
   headerTitle: { fontSize: 28, fontWeight: '700', color: '#fff' },
   headerSubtitle: { fontSize: 14, color: '#F3E5F5', marginTop: 4 },
   notLoggedInContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  notLoggedInTitle: { fontSize: 22, fontWeight: '700', color: '#333', marginBottom: 12 },
-  notLoggedInText: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 32, lineHeight: 22 },
+  notLoggedInTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
+  notLoggedInText: { fontSize: 15, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
   loginPromptButton: { backgroundColor: '#9C27B0', paddingVertical: 14, borderRadius: 12, width: '100%', alignItems: 'center' },
   loginPromptButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  tabContainer: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  tabContainer: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, paddingVertical: 16, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: '#9C27B0' },
-  tabText: { fontSize: 15, fontWeight: '600', color: '#999' },
-  tabTextActive: { color: '#9C27B0' },
+  tabText: { fontSize: 15, fontWeight: '600' },
   content: { flex: 1 },
   section: { padding: 16 },
-  clearButton: { alignSelf: 'flex-end', padding: 8, backgroundColor: '#FFEBEE', borderRadius: 8, marginBottom: 12 },
-  clearButtonText: { color: '#D32F2F', fontWeight: '600', fontSize: 12 },
-  historyItem: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 12, elevation: 2 },
+  clearButton: { alignSelf: 'flex-end', padding: 8, borderRadius: 8, marginBottom: 12 },
+  clearButtonText: { fontWeight: '600', fontSize: 12 },
+  historyItem: { borderRadius: 12, padding: 12, marginBottom: 12, elevation: 2 },
   historyContent: { flexDirection: 'row', marginBottom: 12 },
   historyThumbnail: { width: 70, height: 90, borderRadius: 6 },
   historyInfo: { flex: 1, marginLeft: 12 },
   historyTitle: { fontSize: 16, fontWeight: '600' },
-  historyChapter: { color: '#007AFF', marginTop: 4 },
-  historyDate: { color: '#999', fontSize: 12, marginTop: 4 },
+  historyChapter: { marginTop: 4 },
+  historyDate: { fontSize: 12, marginTop: 4 },
   historyActions: { flexDirection: 'row', gap: 8 },
-  continueButton: { flex: 1, backgroundColor: '#007AFF', padding: 10, borderRadius: 8, alignItems: 'center' },
+  continueButton: { flex: 1, padding: 10, borderRadius: 8, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '600' },
-  removeButton: { backgroundColor: '#FFEBEE', padding: 10, borderRadius: 8 },
-  removeButtonText: { color: '#D32F2F' },
+  removeButton: { padding: 10, borderRadius: 8 },
+  removeButtonText: {},
   favoriteItem: { marginBottom: 16 },
-  unfavoriteButton: { marginTop: 8, backgroundColor: '#FFEBEE', padding: 10, borderRadius: 8, alignItems: 'center' },
-  unfavoriteText: { color: '#D32F2F', fontWeight: '600' },
+  unfavoriteButton: { marginTop: 8, padding: 10, borderRadius: 8, alignItems: 'center' },
+  unfavoriteText: { fontWeight: '600' },
   emptyContainer: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 60, marginBottom: 10 },
-  emptyText: { color: '#999' }
+  emptyText: {}
 });

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  FlatList,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,9 +15,14 @@ import { Category, Story } from '@/types';
 import { CategoryChip } from '@/components/CategoryChip';
 import { StoryCard } from '@/components/StoryCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { activeTheme } = useTheme();
+  const colors = Colors[activeTheme];
+  
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -38,7 +42,6 @@ export default function ExploreScreen() {
   }, [selectedCategory]);
 
   useEffect(() => {
-    // Debounce search
     const timer = setTimeout(() => {
       if (searchQuery.trim().length > 0) {
         handleSearch();
@@ -95,7 +98,7 @@ export default function ExploreScreen() {
       setStories([]);
     } else {
       setSelectedCategory(category.slug);
-      setSearchQuery(''); // Clear search khi chọn category
+      setSearchQuery('');
       setSearchResults([]);
     }
   };
@@ -111,17 +114,18 @@ export default function ExploreScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🔍 Khám Phá</Text>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>🔍 Khám Phá</Text>
         
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.borderLight }]}>
           <Text style={styles.searchIcon}>🔎</Text>
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Tìm kiếm truyện..."
+            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -134,7 +138,7 @@ export default function ExploreScreen() {
               }}
               style={styles.clearButton}
             >
-              <Text style={styles.clearButtonText}>✕</Text>
+              <Text style={[styles.clearButtonText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -143,8 +147,8 @@ export default function ExploreScreen() {
       <ScrollView style={styles.content}>
         {/* Categories Section */}
         {searchQuery.trim().length === 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📚 Thể Loại</Text>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>📚 Thể Loại</Text>
             <View style={styles.categoriesContainer}>
               {categories.map((category) => (
                 <CategoryChip
@@ -159,18 +163,18 @@ export default function ExploreScreen() {
         )}
 
         {/* Stories List */}
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
           {isSearching ? (
             <LoadingSpinner size="small" text="Đang tìm kiếm..." />
           ) : (
             <>
               {searchQuery.trim().length > 0 && (
-                <Text style={styles.sectionTitle}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   🔎 Kết quả tìm kiếm {searchQuery} ({searchResults.length})
                 </Text>
               )}
               {selectedCategory && searchQuery.trim().length === 0 && (
-                <Text style={styles.sectionTitle}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   📖 Truyện {categories.find(c => c.slug === selectedCategory)?.name} ({stories.length})
                 </Text>
               )}
@@ -188,7 +192,7 @@ export default function ExploreScreen() {
               ) : (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyIcon}>📭</Text>
-                  <Text style={styles.emptyText}>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                     {searchQuery.trim().length > 0
                       ? 'Không tìm thấy truyện nào'
                       : selectedCategory
@@ -208,26 +212,21 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#fff',
     paddingTop: 60,
     paddingBottom: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
     marginBottom: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
@@ -239,27 +238,23 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
   },
   clearButton: {
     padding: 4,
   },
   clearButtonText: {
     fontSize: 18,
-    color: '#999',
   },
   content: {
     flex: 1,
   },
   section: {
     marginTop: 16,
-    backgroundColor: '#fff',
     padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#333',
     marginBottom: 12,
   },
   categoriesContainer: {
@@ -279,7 +274,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     textAlign: 'center',
   },
 });

@@ -13,11 +13,16 @@ import { storyService } from '@/services/storyService';
 import { Story } from '@/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StoryCard } from '@/components/StoryCard';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 
 type RankingType = 'views' | 'rating';
 
 export default function RankingScreen() {
   const router = useRouter();
+  const { activeTheme } = useTheme();
+  const colors = Colors[activeTheme];
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<RankingType>('views');
@@ -69,7 +74,7 @@ export default function RankingScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🏆 Bảng Xếp Hạng</Text>
@@ -77,23 +82,37 @@ export default function RankingScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'views' && styles.tabActive]}
+          style={[
+            styles.tab, 
+            selectedTab === 'views' && styles.tabActive
+          ]}
           onPress={() => setSelectedTab('views')}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, selectedTab === 'views' && styles.tabTextActive]}>
+          <Text style={[
+            styles.tabText, 
+            selectedTab === 'views' && styles.tabTextActive,
+            { color: selectedTab === 'views' ? '#FF9800' : colors.textSecondary }
+          ]}>
             👁 Lượt Xem
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'rating' && styles.tabActive]}
+          style={[
+            styles.tab, 
+            selectedTab === 'rating' && styles.tabActive
+          ]}
           onPress={() => setSelectedTab('rating')}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, selectedTab === 'rating' && styles.tabTextActive]}>
+          <Text style={[
+            styles.tabText,
+            selectedTab === 'rating' && styles.tabTextActive,
+            { color: selectedTab === 'rating' ? '#FF9800' : colors.textSecondary }
+          ]}>
             ⭐ Đánh Giá
           </Text>
         </TouchableOpacity>
@@ -116,8 +135,12 @@ export default function RankingScreen() {
                   index === 0 && styles.rankBadgeGold,
                   index === 1 && styles.rankBadgeSilver,
                   index === 2 && styles.rankBadgeBronze,
+                  index > 2 && { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.border }
                 ]}>
-                  <Text style={styles.rankNumber}>
+                  <Text style={[
+                    styles.rankNumber,
+                    index > 2 && { color: colors.text }
+                  ]}>
                     {index < 3 ? (index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉') : `${index + 1}`}
                   </Text>
                 </View>
@@ -130,7 +153,10 @@ export default function RankingScreen() {
                   />
                   
                   {/* Stats Badge */}
-                  <View style={styles.statsBadge}>
+                  <View style={[
+                    styles.statsBadge,
+                    { backgroundColor: activeTheme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.7)' }
+                  ]}>
                     {selectedTab === 'views' ? (
                       <Text style={styles.statsText}>
                         👁 {formatNumber(story.views)} lượt xem
@@ -147,10 +173,15 @@ export default function RankingScreen() {
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📊</Text>
-              <Text style={styles.emptyText}>Chưa có dữ liệu xếp hạng</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Chưa có dữ liệu xếp hạng
+              </Text>
             </View>
           )}
         </View>
+
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
@@ -169,7 +200,6 @@ function formatNumber(num: number): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     backgroundColor: '#FF9800',
@@ -189,9 +219,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   tab: {
     flex: 1,
@@ -206,7 +234,6 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#999',
   },
   tabTextActive: {
     color: '#FF9800',
@@ -254,7 +281,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -274,7 +300,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
     textAlign: 'center',
+  },
+  bottomSpacing: {
+    height: 32,
   },
 });

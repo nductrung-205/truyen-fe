@@ -14,9 +14,14 @@ import { Story } from '@/types';
 import { StoryCard } from '@/components/StoryCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { SectionHeader } from '@/components/SectionHeader';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 
 export default function IndexScreen() {
   const router = useRouter();
+  const { activeTheme } = useTheme();
+  const colors = Colors[activeTheme];
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hotStories, setHotStories] = useState<Story[]>([]);
@@ -30,7 +35,6 @@ export default function IndexScreen() {
     try {
       setLoading(true);
       
-      // Gọi song song 2 API
       const [hotRes, newRes] = await Promise.all([
         storyService.getHotStories(),
         storyService.getAllStories(0, 10, 'createdAt'),
@@ -62,19 +66,21 @@ export default function IndexScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.blue }]}>
         <Text style={styles.headerTitle}>📚 Truyện Hay</Text>
-        <Text style={styles.headerSubtitle}>Khám phá thế giới truyện tranh</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.blueLight }]}>
+          Khám phá thế giới truyện tranh
+        </Text>
       </View>
 
       {/* Hot Stories Section */}
-      <View style={styles.section}>
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
         <SectionHeader 
           title="Truyện Hot" 
           icon="🔥"
@@ -98,12 +104,14 @@ export default function IndexScreen() {
             contentContainerStyle={styles.horizontalList}
           />
         ) : (
-          <Text style={styles.emptyText}>Chưa có truyện hot</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Chưa có truyện hot
+          </Text>
         )}
       </View>
 
       {/* New Stories Section */}
-      <View style={styles.section}>
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
         <SectionHeader 
           title="Mới Cập Nhật" 
           icon="✨"
@@ -120,12 +128,13 @@ export default function IndexScreen() {
               />
             ))
           ) : (
-            <Text style={styles.emptyText}>Chưa có truyện mới</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Chưa có truyện mới
+            </Text>
           )}
         </View>
       </View>
 
-      {/* Bottom Spacing */}
       <View style={styles.bottomSpacing} />
     </ScrollView>
   );
@@ -134,10 +143,8 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 24,
@@ -150,11 +157,9 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#E3F2FD',
   },
   section: {
     marginTop: 16,
-    backgroundColor: '#fff',
     borderRadius: 12,
     marginHorizontal: 8,
     overflow: 'hidden',
@@ -173,7 +178,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#999',
     padding: 20,
     fontSize: 14,
   },
