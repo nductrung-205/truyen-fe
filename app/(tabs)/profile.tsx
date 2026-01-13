@@ -153,6 +153,11 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     const performLogout = async () => {
+      // Reset theme về light mode trước khi đăng xuất
+      if (isDarkMode) {
+        toggleTheme(); // Chuyển về light mode
+      }
+
       await authService.logout();
       router.replace('/');
     };

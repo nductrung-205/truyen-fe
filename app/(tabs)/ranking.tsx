@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,10 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StoryCard } from '@/components/StoryCard';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
+import { Ionicons } from '@expo/vector-icons'; // Đảm bảo bạn đã cài expo-icons
 
 type RankingType = 'views' | 'rating';
+type SortOrder = 'desc' | 'asc'; // desc: nhiều nhất, asc: ít nhất
 
 export default function RankingScreen() {
   const router = useRouter();
@@ -26,8 +28,8 @@ export default function RankingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<RankingType>('views');
-  const [topViewStories, setTopViewStories] = useState<Story[]>([]);
-  const [topRatingStories, setTopRatingStories] = useState<Story[]>([]);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [allStories, setAllStories] = useState<Story[]>([]);
 
   useEffect(() => {
     loadData();
@@ -36,32 +38,9 @@ export default function RankingScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-
-      // Load hot stories (top views)
-      const hotResponse = await storyService.getHotStories();
-      setTopViewStories(hotResponse.data);
-
-      // Load all stories và sort theo rating
-      const allResponse = await storyService.getAllStories(0, 50, 'rating');
-      const sortedByRating = allResponse.data.stories.sort((a: Story, b: Story) => {
-        const ratingA = a.rating || 0;
-        const ratingB = b.rating || 0;
-
-        // Sắp xếp theo rating trước
-        if (ratingB !== ratingA) {
-          return ratingB - ratingA;
-        }
-
-        // Nếu rating bằng nhau, sắp xếp theo lượt xem
-        return (b.views || 0) - (a.views || 0);
-
-        // Hoặc sắp xếp theo số chapter
-        // return (b.chapters?.length || 0) - (a.chapters?.length || 0);
-
-        // Hoặc sắp xếp theo thời gian cập nhật (mới nhất lên đầu)
-        // return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
-      setTopRatingStories(sortedByRating);
+      // Lấy danh sách truyện (lấy khoảng 50-100 truyện để xếp hạng cục bộ)
+      const response = await storyService.getAllStories(0, 100);
+      setAllStories(response.data.stories);
     } catch (error) {
       console.error('Error loading ranking data:', error);
       Alert.alert('Lỗi', 'Không thể tải dữ liệu xếp hạng');
@@ -76,11 +55,27 @@ export default function RankingScreen() {
     setRefreshing(false);
   };
 
+  // Logic sắp xếp dữ liệu dựa trên Tab và Order
+  const displayStories = useMemo(() => {
+    return [...allStories].sort((a, b) => {
+      const valA = selectedTab === 'views' ? a.views : (a.rating || 0);
+      const valB = selectedTab === 'views' ? b.views : (b.rating || 0);
+
+      if (sortOrder === 'desc') {
+        return valB - valA; // Nhiều nhất lên đầu
+      } else {
+        return valA - valB; // Ít nhất lên đầu
+      }
+    });
+  }, [allStories, selectedTab, sortOrder]);
+
   const navigateToStory = (storyId: number) => {
     router.push(`/story/${storyId}`);
   };
 
-  const displayStories = selectedTab === 'views' ? topViewStories : topRatingStories;
+  const toggleSortOrder = () => {
+    setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+  };
 
   if (loading) {
     return <LoadingSpinner text="Đang tải xếp hạng..." />;
@@ -91,42 +86,44 @@ export default function RankingScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🏆 Bảng Xếp Hạng</Text>
-        <Text style={styles.headerSubtitle}>Top truyện được yêu thích nhất</Text>
+        <Text style={styles.headerSubtitle}>Khám phá truyện theo sở thích của bạn</Text>
       </View>
 
-      {/* Tabs */}
-      <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            selectedTab === 'views' && styles.tabActive
-          ]}
-          onPress={() => setSelectedTab('views')}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.tabText,
-            selectedTab === 'views' && styles.tabTextActive,
-            { color: selectedTab === 'views' ? '#FF9800' : colors.textSecondary }
-          ]}>
-            👁 Lượt Xem
-          </Text>
-        </TouchableOpacity>
+      {/* Tabs & Filter Bar */}
+      <View style={[styles.filterBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={styles.tabWrapper}>
+          <TouchableOpacity
+            style={[styles.tab, selectedTab === 'views' && styles.tabActive]}
+            onPress={() => setSelectedTab('views')}
+          >
+            <Text style={[styles.tabText, { color: selectedTab === 'views' ? '#FF9800' : colors.textSecondary }]}>
+              👁 Lượt Xem
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            selectedTab === 'rating' && styles.tabActive
-          ]}
-          onPress={() => setSelectedTab('rating')}
+          <TouchableOpacity
+            style={[styles.tab, selectedTab === 'rating' && styles.tabActive]}
+            onPress={() => setSelectedTab('rating')}
+          >
+            <Text style={[styles.tabText, { color: selectedTab === 'rating' ? '#FF9800' : colors.textSecondary }]}>
+              ⭐ Đánh Giá
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Nút Toggle Sắp xếp */}
+        <TouchableOpacity 
+          style={[styles.sortToggle, { backgroundColor: colors.border }]} 
+          onPress={toggleSortOrder}
           activeOpacity={0.7}
         >
-          <Text style={[
-            styles.tabText,
-            selectedTab === 'rating' && styles.tabTextActive,
-            { color: selectedTab === 'rating' ? '#FF9800' : colors.textSecondary }
-          ]}>
-            ⭐ Đánh Giá
+          <Ionicons 
+            name={sortOrder === 'desc' ? "trending-down" : "trending-up"} 
+            size={18} 
+            color={colors.text} 
+          />
+          <Text style={[styles.sortToggleText, { color: colors.text }]}>
+            {sortOrder === 'desc' ? 'Nhiều nhất' : 'Ít nhất'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -134,9 +131,7 @@ export default function RankingScreen() {
       {/* Content */}
       <ScrollView
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.rankingList}>
           {displayStories.length > 0 ? (
@@ -145,40 +140,32 @@ export default function RankingScreen() {
                 {/* Rank Badge */}
                 <View style={[
                   styles.rankBadge,
-                  index === 0 && styles.rankBadgeGold,
-                  index === 1 && styles.rankBadgeSilver,
-                  index === 2 && styles.rankBadgeBronze,
-                  index > 2 && { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.border }
+                  sortOrder === 'desc' && index === 0 && styles.rankBadgeGold,
+                  sortOrder === 'desc' && index === 1 && styles.rankBadgeSilver,
+                  sortOrder === 'desc' && index === 2 && styles.rankBadgeBronze,
+                  (sortOrder === 'asc' || index > 2) && { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }
                 ]}>
-                  <Text style={[
-                    styles.rankNumber,
-                    index > 2 && { color: colors.text }
-                  ]}>
-                    {index < 3 ? (index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉') : `${index + 1}`}
+                  <Text style={[styles.rankNumber, (sortOrder === 'asc' || index > 2) && { color: colors.text }]}>
+                    {sortOrder === 'desc' && index < 3 
+                      ? (index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉') 
+                      : `${index + 1}`}
                   </Text>
                 </View>
 
                 {/* Story Card */}
                 <View style={styles.storyCardContainer}>
-                  <StoryCard
-                    story={story}
-                    onPress={() => navigateToStory(story.id)}
-                  />
+                  <StoryCard story={story} onPress={() => navigateToStory(story.id)} />
 
                   {/* Stats Badge */}
                   <View style={[
                     styles.statsBadge,
-                    { backgroundColor: activeTheme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.7)' }
+                    { backgroundColor: activeTheme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.7)' }
                   ]}>
-                    {selectedTab === 'views' ? (
-                      <Text style={styles.statsText}>
-                        👁 {formatNumber(story.views)} lượt xem
-                      </Text>
-                    ) : (
-                      <Text style={styles.statsText}>
-                        ⭐ {story.rating?.toFixed(1) || 0} / 5.0
-                      </Text>
-                    )}
+                    <Text style={styles.statsText}>
+                      {selectedTab === 'views' 
+                        ? `👁 ${formatNumber(story.views)}` 
+                        : `⭐ ${story.rating?.toFixed(1) || 0}`}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -186,14 +173,10 @@ export default function RankingScreen() {
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📊</Text>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Chưa có dữ liệu xếp hạng
-              </Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Không tìm thấy dữ liệu</Text>
             </View>
           )}
         </View>
-
-        {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
@@ -201,121 +184,75 @@ export default function RankingScreen() {
 }
 
 function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K';
-  }
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     backgroundColor: '#FF9800',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 24,
+    paddingTop: 50,
+    paddingBottom: 20,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#FFF3E0',
-  },
-  tabContainer: {
+  headerTitle: { fontSize: 24, fontWeight: '700', color: '#fff' },
+  headerSubtitle: { fontSize: 13, color: '#FFF3E0', marginTop: 4 },
+  filterBar: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    height: 60,
+  },
+  tabWrapper: { flexDirection: 'row', flex: 1 },
+  tab: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 10,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabActive: {
-    borderBottomColor: '#FF9800',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: '#FF9800',
-  },
-  content: {
-    flex: 1,
-  },
-  rankingList: {
-    padding: 16,
-  },
-  rankingItem: {
+  tabActive: { borderBottomColor: '#FF9800' },
+  tabText: { fontSize: 15, fontWeight: '600' },
+  sortToggle: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  rankBadge: {
-    width: 40,
-    height: 40,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#E0E0E0',
+  },
+  sortToggleText: { fontSize: 12, fontWeight: '600', marginLeft: 4 },
+  content: { flex: 1 },
+  rankingList: { padding: 16 },
+  rankingItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
+  rankBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
-    marginTop: 12,
+    marginRight: 10,
+    marginTop: 10,
   },
-  rankBadgeGold: {
-    backgroundColor: '#FFD700',
-  },
-  rankBadgeSilver: {
-    backgroundColor: '#C0C0C0',
-  },
-  rankBadgeBronze: {
-    backgroundColor: '#CD7F32',
-  },
-  rankNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
-  },
-  storyCardContainer: {
-    flex: 1,
-    position: 'relative',
-  },
+  rankBadgeGold: { backgroundColor: '#FFD700' },
+  rankBadgeSilver: { backgroundColor: '#C0C0C0' },
+  rankBadgeBronze: { backgroundColor: '#CD7F32' },
+  rankNumber: { fontSize: 14, fontWeight: '700' },
+  storyCardContainer: { flex: 1, position: 'relative' },
   statsBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    top: 6,
+    right: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  statsText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  bottomSpacing: {
-    height: 32,
-  },
+  statsText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyIcon: { fontSize: 50, marginBottom: 10 },
+  emptyText: { fontSize: 16 },
+  bottomSpacing: { height: 40 },
 });
