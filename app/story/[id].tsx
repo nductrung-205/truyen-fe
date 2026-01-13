@@ -9,7 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { storyService } from '@/services/storyService';
 import { chapterService } from '@/services/chapterService';
 import { storageService, ReadingHistoryItem } from '@/services/storageService';
@@ -61,7 +61,6 @@ export default function StoryDetailScreen() {
   };
 
   const handleToggleFavorite = async () => {
-    // YÊU CẦU ĐĂNG NHẬP ĐỂ THÍCH TRUYỆN
     if (!user) {
       if (Platform.OS === 'web') {
         if (window.confirm("Bạn cần đăng nhập để yêu thích truyện. Đi tới trang đăng nhập?")) {
@@ -108,61 +107,64 @@ export default function StoryDetailScreen() {
   const displayedChapters = showAllChapters ? chapters : chapters.slice(0, 10);
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.coverContainer}>
-          <Image source={{ uri: story.thumbnailUrl }} style={styles.coverImage} resizeMode="cover" />
-          <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>‹</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.favoriteButton} onPress={handleToggleFavorite}>
-            <Text style={styles.favoriteIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.infoContainer}>
-          <Text style={styles.title}>{story.title}</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>✍️ {story.authorName}</Text>
-            <Text style={styles.metaText}>👁 {story.views} lượt xem</Text>
-          </View>
-
-          <View style={styles.categoriesContainer}>
-            {story.categoryNames?.map((cat, i) => (
-              <View key={i} style={styles.categoryChip}><Text style={styles.categoryText}>{cat}</Text></View>
-            ))}
-          </View>
-
-          <View style={styles.descriptionContainer}>
-            <Text style={styles.sectionTitle}>📝 Giới thiệu</Text>
-            <Text style={styles.description}>{story.description}</Text>
-          </View>
-        </View>
-
-        <View style={styles.chaptersContainer}>
-          <Text style={[styles.sectionTitle, { paddingHorizontal: 16 }]}>📚 Danh sách chương</Text>
-          {displayedChapters.map((ch) => (
-            <ChapterItem key={ch.id} chapter={ch} onPress={() => handleReadChapter(ch.chapterNumber)} />
-          ))}
-          {chapters.length > 10 && !showAllChapters && (
-            <TouchableOpacity style={styles.showMoreButton} onPress={() => setShowAllChapters(true)}>
-              <Text style={styles.showMoreText}>Xem thêm chương →</Text>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.coverContainer}>
+            <Image source={{ uri: story.thumbnailUrl }} style={styles.coverImage} resizeMode="cover" />
+            <View style={styles.coverOverlay} />
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>‹</Text>
             </TouchableOpacity>
-          )}
-        </View>
-        <View style={{ height: 80 }} />
-      </ScrollView>
+            <TouchableOpacity style={styles.favoriteButton} onPress={handleToggleFavorite}>
+              <Text style={styles.favoriteIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
+            </TouchableOpacity>
+          </View>
 
-      <View style={styles.bottomActions}>
-        <TouchableOpacity style={styles.readButton} onPress={() => handleReadChapter(chapters[0]?.chapterNumber || 1)}>
-          <Text style={styles.readButtonText}>📖 Đọc từ đầu</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.readButton, { backgroundColor: '#4CAF50' }]} onPress={() => handleReadChapter(lastReadChapter || 1)}>
-          <Text style={styles.readButtonText}>{lastReadChapter ? '▶️ Đọc tiếp' : '▶️ Bắt đầu'}</Text>
-        </TouchableOpacity>
+          <View style={styles.infoContainer}>
+            <Text style={styles.title}>{story.title}</Text>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>✍️ {story.authorName}</Text>
+              <Text style={styles.metaText}>👁 {story.views} lượt xem</Text>
+            </View>
+
+            <View style={styles.categoriesContainer}>
+              {story.categoryNames?.map((cat, i) => (
+                <View key={i} style={styles.categoryChip}><Text style={styles.categoryText}>{cat}</Text></View>
+              ))}
+            </View>
+
+            <View style={styles.descriptionContainer}>
+              <Text style={styles.sectionTitle}>📝 Giới thiệu</Text>
+              <Text style={styles.description}>{story.description}</Text>
+            </View>
+          </View>
+
+          <View style={styles.chaptersContainer}>
+            <Text style={[styles.sectionTitle, { paddingHorizontal: 16 }]}>📚 Danh sách chương</Text>
+            {displayedChapters.map((ch) => (
+              <ChapterItem key={ch.id} chapter={ch} onPress={() => handleReadChapter(ch.chapterNumber)} />
+            ))}
+            {chapters.length > 10 && !showAllChapters && (
+              <TouchableOpacity style={styles.showMoreButton} onPress={() => setShowAllChapters(true)}>
+                <Text style={styles.showMoreText}>Xem thêm chương →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={{ height: 80 }} />
+        </ScrollView>
+
+        <View style={styles.bottomActions}>
+          <TouchableOpacity style={styles.readButton} onPress={() => handleReadChapter(chapters[0]?.chapterNumber || 1)}>
+            <Text style={styles.readButtonText}>📖 Đọc từ đầu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.readButton, { backgroundColor: '#4CAF50' }]} onPress={() => handleReadChapter(lastReadChapter || 1)}>
+            <Text style={styles.readButtonText}>{lastReadChapter ? '▶️ Đọc tiếp' : '▶️ Bắt đầu'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 

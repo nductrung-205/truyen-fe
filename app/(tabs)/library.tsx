@@ -23,6 +23,12 @@ import { Colors } from '@/constants/Colors';
 
 type TabType = 'history' | 'favorites';
 
+// Extended history item với thông tin chi tiết hơn
+interface ExtendedHistoryItem extends ReadingHistoryItem {
+  allReadChapters?: number[]; // Danh sách tất cả các chương đã đọc
+  isExpanded?: boolean; // Trạng thái mở rộng
+}
+
 export default function LibraryScreen() {
   const router = useRouter();
   const { activeTheme } = useTheme();
@@ -32,7 +38,7 @@ export default function LibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<TabType>('history');
-  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>([]);
+  const [readingHistory, setReadingHistory] = useState<ExtendedHistoryItem[]>([]);
   const [favoriteStories, setFavoriteStories] = useState<Story[]>([]);
 
   useFocusEffect(
@@ -62,7 +68,42 @@ export default function LibraryScreen() {
 
   const loadReadingHistory = async () => {
     const history = await storageService.getReadingHistory();
-    setReadingHistory(history);
+    
+    // Nhóm các chương theo storyId
+    const groupedHistory = history.reduce((acc, item) => {
+      if (!acc[item.storyId]) {
+        acc[item.storyId] = {
+          ...item,
+          allReadChapters: [item.lastReadChapter],
+          isExpanded: false,
+        };
+      } else {
+        // Thêm chương vào danh sách nếu chưa có
+        if (!acc[item.storyId].allReadChapters!.includes(item.lastReadChapter)) {
+          acc[item.storyId].allReadChapters!.push(item.lastReadChapter);
+        }
+        // Cập nhật lastReadAt nếu mới hơn
+        if (new Date(item.lastReadAt) > new Date(acc[item.storyId].lastReadAt)) {
+          acc[item.storyId].lastReadAt = item.lastReadAt;
+          acc[item.storyId].lastReadChapter = item.lastReadChapter;
+        }
+      }
+      return acc;
+    }, {} as { [key: number]: ExtendedHistoryItem });
+
+    // Chuyển về array và sắp xếp theo thời gian đọc gần nhất
+    const sortedHistory = Object.values(groupedHistory).sort((a, b) => 
+      new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime()
+    );
+
+    // Sắp xếp các chương đã đọc theo thứ tự tăng dần
+    sortedHistory.forEach(item => {
+      if (item.allReadChapters) {
+        item.allReadChapters.sort((a, b) => a - b);
+      }
+    });
+
+    setReadingHistory(sortedHistory);
   };
 
   const loadFavorites = async () => {
@@ -87,6 +128,14 @@ export default function LibraryScreen() {
     setRefreshing(true);
     await checkAuthAndLoad();
     setRefreshing(false);
+  };
+
+  const toggleExpandChapters = (storyId: number) => {
+    setReadingHistory(prev => prev.map(item => 
+      item.storyId === storyId 
+        ? { ...item, isExpanded: !item.isExpanded }
+        : item
+    ));
   };
 
   const handleRemoveHistory = (storyId: number) => {
@@ -171,7 +220,7 @@ export default function LibraryScreen() {
             styles.tabText, 
             { color: selectedTab === 'history' ? '#9C27B0' : colors.textSecondary }
           ]}>
-            🕒 Đã đọc ({readingHistory.length})
+            🕒 Đã đọc ({readingHistory.length}) truyện
           </Text>
         </TouchableOpacity>
 
@@ -218,13 +267,44 @@ export default function LibraryScreen() {
                         {item.storyTitle}
                       </Text>
                       <Text style={[styles.historyChapter, { color: colors.blue }]}>
-                        Chương {item.lastReadChapter}
+                        Đọc gần nhất: Chương {item.lastReadChapter}
                       </Text>
+                      {item.allReadChapters && item.allReadChapters.length > 1 && (
+                        <Text style={[styles.chapterCount, { color: colors.textSecondary }]}>
+                          📖 Đã đọc {item.allReadChapters.length} chương
+                        </Text>
+                      )}
                       <Text style={[styles.historyDate, { color: colors.textSecondary }]}>
                         {formatDate(item.lastReadAt)}
                       </Text>
                     </View>
                   </TouchableOpacity>
+
+                  {/* Show all read chapters when expanded */}
+                  {item.isExpanded && item.allReadChapters && item.allReadChapters.length > 1 && (
+                    <View style={[styles.chaptersListContainer, { backgroundColor: colors.background }]}>
+                      <Text style={[styles.chaptersListTitle, { color: colors.text }]}>
+                        Các chương đã đọc:
+                      </Text>
+                      <View style={styles.chaptersList}>
+                        {item.allReadChapters.map((chapterNum) => (
+                          <TouchableOpacity
+                            key={chapterNum}
+                            style={[
+                              styles.chapterBadge,
+                              { backgroundColor: colors.blue + '20', borderColor: colors.blue }
+                            ]}
+                            onPress={() => router.push(`/chapter/${item.storyId}/${chapterNum}`)}
+                          >
+                            <Text style={[styles.chapterBadgeText, { color: colors.blue }]}>
+                              C{chapterNum}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
                   <View style={styles.historyActions}>
                     <TouchableOpacity 
                       style={[styles.continueButton, { backgroundColor: colors.blue }]} 
@@ -232,6 +312,18 @@ export default function LibraryScreen() {
                     >
                       <Text style={styles.continueButtonText}>Đọc tiếp</Text>
                     </TouchableOpacity>
+                    
+                    {item.allReadChapters && item.allReadChapters.length > 1 && (
+                      <TouchableOpacity 
+                        style={[styles.expandButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]} 
+                        onPress={() => toggleExpandChapters(item.storyId)}
+                      >
+                        <Text style={[styles.expandButtonText, { color: colors.text }]}>
+                          {item.isExpanded ? '▲' : '▼'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    
                     <TouchableOpacity 
                       style={[styles.removeButton, { backgroundColor: colors.dangerLight }]} 
                       onPress={() => handleRemoveHistory(item.storyId)}
@@ -306,17 +398,54 @@ const styles = StyleSheet.create({
   historyThumbnail: { width: 70, height: 90, borderRadius: 6 },
   historyInfo: { flex: 1, marginLeft: 12 },
   historyTitle: { fontSize: 16, fontWeight: '600' },
-  historyChapter: { marginTop: 4 },
+  historyChapter: { marginTop: 4, fontSize: 13 },
+  chapterCount: { marginTop: 4, fontSize: 12 },
   historyDate: { fontSize: 12, marginTop: 4 },
+  chaptersListContainer: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  chaptersListTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  chaptersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chapterBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  chapterBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   historyActions: { flexDirection: 'row', gap: 8 },
   continueButton: { flex: 1, padding: 10, borderRadius: 8, alignItems: 'center' },
   continueButtonText: { color: '#fff', fontWeight: '600' },
-  removeButton: { padding: 10, borderRadius: 8 },
-  removeButtonText: {},
+  expandButton: {
+    padding: 10,
+    borderRadius: 8,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  expandButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  removeButton: { padding: 10, borderRadius: 8, minWidth: 40, alignItems: 'center' },
+  removeButtonText: { fontSize: 16 },
   favoriteItem: { marginBottom: 16 },
   unfavoriteButton: { marginTop: 8, padding: 10, borderRadius: 8, alignItems: 'center' },
   unfavoriteText: { fontWeight: '600' },
   emptyContainer: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 60, marginBottom: 10 },
-  emptyText: {}
+  emptyText: { fontSize: 15 }
 });

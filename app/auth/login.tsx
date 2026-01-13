@@ -10,7 +10,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { authService } from '@/services/authService';
 
 export default function LoginScreen() {
@@ -46,74 +46,90 @@ export default function LoginScreen() {
     router.push('/auth/register');
   };
 
+  const navigateToHome = () => {
+    router.push('/');
+  };
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoIcon}>📚</Text>
-          <Text style={styles.logoText}>Truyện Hay</Text>
-          <Text style={styles.subtitle}>Đọc truyện mọi lúc, mọi nơi</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-          <Text style={styles.title}>Đăng Nhập</Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Tên đăng nhập</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập tên đăng nhập"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nhập mật khẩu"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={handleLogin}
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <View style={styles.content}>
+          {/* Nút trở về trang chủ */}
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={navigateToHome}
             disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Đăng nhập</Text>
-            )}
+            <Text style={styles.backButtonText}>← Trang chủ</Text>
           </TouchableOpacity>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>HOẶC</Text>
-            <View style={styles.dividerLine} />
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoIcon}>📚</Text>
+            <Text style={styles.logoText}>Truyện Hay</Text>
+            <Text style={styles.subtitle}>Đọc truyện mọi lúc, mọi nơi</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={navigateToRegister}
-            disabled={loading}
-          >
-            <Text style={styles.registerButtonText}>Đăng ký tài khoản mới</Text>
-          </TouchableOpacity>
+          {/* Form */}
+          <View style={styles.form}>
+            <Text style={styles.title}>Đăng Nhập</Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Tên đăng nhập</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập tên đăng nhập"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập mật khẩu"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>HOẶC</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={navigateToRegister}
+              disabled={loading}
+            >
+              <Text style={styles.registerButtonText}>Đăng ký tài khoản mới</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -126,6 +142,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 24,
+    zIndex: 10,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   logoContainer: {
     alignItems: 'center',

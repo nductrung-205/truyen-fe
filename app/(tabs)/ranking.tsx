@@ -22,7 +22,7 @@ export default function RankingScreen() {
   const router = useRouter();
   const { activeTheme } = useTheme();
   const colors = Colors[activeTheme];
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<RankingType>('views');
@@ -36,7 +36,7 @@ export default function RankingScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      
+
       // Load hot stories (top views)
       const hotResponse = await storyService.getHotStories();
       setTopViewStories(hotResponse.data);
@@ -46,7 +46,20 @@ export default function RankingScreen() {
       const sortedByRating = allResponse.data.stories.sort((a: Story, b: Story) => {
         const ratingA = a.rating || 0;
         const ratingB = b.rating || 0;
-        return ratingB - ratingA;
+
+        // Sắp xếp theo rating trước
+        if (ratingB !== ratingA) {
+          return ratingB - ratingA;
+        }
+
+        // Nếu rating bằng nhau, sắp xếp theo lượt xem
+        return (b.views || 0) - (a.views || 0);
+
+        // Hoặc sắp xếp theo số chapter
+        // return (b.chapters?.length || 0) - (a.chapters?.length || 0);
+
+        // Hoặc sắp xếp theo thời gian cập nhật (mới nhất lên đầu)
+        // return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
       setTopRatingStories(sortedByRating);
     } catch (error) {
@@ -85,14 +98,14 @@ export default function RankingScreen() {
       <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={[
-            styles.tab, 
+            styles.tab,
             selectedTab === 'views' && styles.tabActive
           ]}
           onPress={() => setSelectedTab('views')}
           activeOpacity={0.7}
         >
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             selectedTab === 'views' && styles.tabTextActive,
             { color: selectedTab === 'views' ? '#FF9800' : colors.textSecondary }
           ]}>
@@ -102,7 +115,7 @@ export default function RankingScreen() {
 
         <TouchableOpacity
           style={[
-            styles.tab, 
+            styles.tab,
             selectedTab === 'rating' && styles.tabActive
           ]}
           onPress={() => setSelectedTab('rating')}
@@ -151,7 +164,7 @@ export default function RankingScreen() {
                     story={story}
                     onPress={() => navigateToStory(story.id)}
                   />
-                  
+
                   {/* Stats Badge */}
                   <View style={[
                     styles.statsBadge,

@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { authService } from '@/services/authService';
 
 export default function RegisterScreen() {
@@ -24,11 +24,9 @@ export default function RegisterScreen() {
 
   const showAlert = (title: string, message: string, onPress?: () => void) => {
     if (Platform.OS === 'web') {
-      // Trên Web dùng alert mặc định của trình duyệt
       alert(`${title}: ${message}`);
       if (onPress) onPress();
     } else {
-      // Trên điện thoại dùng Alert của React Native
       Alert.alert(title, message, onPress ? [{ text: 'OK', onPress }] : []);
     }
   };
@@ -36,20 +34,17 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     console.log(">>> Bắt đầu Validation...");
 
-    // 1. Kiểm tra trống
     if (!username.trim() || !email.trim() || !password || !confirmPassword) {
       console.log("Lỗi: Thiếu thông tin", { username, email });
       showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin (Đặc biệt là Email)');
       return;
     }
 
-    // 2. Kiểm tra độ dài username
     if (username.trim().length < 3) {
       showAlert('Lỗi', 'Tên đăng nhập phải có ít nhất 3 ký tự');
       return;
     }
 
-    // 3. Kiểm tra định dạng Email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       showAlert('Lỗi', 'Email không hợp lệ');
@@ -88,100 +83,103 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          {/* Header */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>‹ Quay lại</Text>
-          </TouchableOpacity>
-
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoIcon}>📚</Text>
-            <Text style={styles.logoText}>Tạo Tài Khoản</Text>
-            <Text style={styles.subtitle}>Đăng ký để bắt đầu đọc truyện</Text>
-          </View>
-
-          {/* Form */}
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Tên đăng nhập *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Tối thiểu 3 ký tự"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder=""
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mật khẩu *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Tối thiểu 6 ký tự"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Xác nhận mật khẩu *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Nhập lại mật khẩu"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-              />
-            </View>
-
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.content}>
+            {/* Header */}
             <TouchableOpacity
-              style={styles.registerButton}
-              onPress={handleRegister}
-              disabled={loading}
+              style={styles.backButton}
+              onPress={() => router.back()}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.registerButtonText}>Đăng ký</Text>
-              )}
+              <Text style={styles.backButtonText}>‹ Quay lại</Text>
             </TouchableOpacity>
 
-            <View style={styles.termsContainer}>
-              <Text style={styles.termsText}>
-                Bằng việc đăng ký, bạn đã đồng ý với{' '}
-                <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
-                <Text style={styles.termsLink}>Chính sách bảo mật</Text> của
-                chúng tôi
-              </Text>
+            {/* Logo */}
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoIcon}>📚</Text>
+              <Text style={styles.logoText}>Tạo Tài Khoản</Text>
+              <Text style={styles.subtitle}>Đăng ký để bắt đầu đọc truyện</Text>
+            </View>
+
+            {/* Form */}
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Tên đăng nhập *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Tối thiểu 3 ký tự"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder=""
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Mật khẩu *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Tối thiểu 6 ký tự"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Xác nhận mật khẩu *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nhập lại mật khẩu"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.registerButton}
+                onPress={handleRegister}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.registerButtonText}>Đăng ký</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.termsContainer}>
+                <Text style={styles.termsText}>
+                  Bằng việc đăng ký, bạn đã đồng ý với{' '}
+                  <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
+                  <Text style={styles.termsLink}>Chính sách bảo mật</Text> của
+                  chúng tôi
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
