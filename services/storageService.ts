@@ -1,10 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authService } from './authService';
+
+const getScopedKey = (baseKey: string, userId?: string | number) => {
+  const suffix = userId ? userId.toString() : 'guest';
+  return `${baseKey}_${suffix}`;
+};
 
 const KEYS = {
   READING_HISTORY: '@reading_history',
   FAVORITES: '@favorites',
   READING_PROGRESS: '@reading_progress',
+  LIFETIME_STATS: '@lifetime_stats',
 };
+
+export interface LifetimeStats {
+  totalChaptersRead: number;
+}
 
 export interface ReadingHistoryItem {
   storyId: number;
@@ -27,49 +38,67 @@ export interface ReadingProgress {
 // ============================================
 
 export const storageService = {
+  async getCurrentUserId(): Promise<string | undefined> {
+    const user = await authService.getStoredUser();
+    return user?.id?.toString();
+  },
   // Lấy lịch sử đọc
-  async getReadingHistory(): Promise<ReadingHistoryItem[]> {
+  async getReadingHistory(userId?: string): Promise<ReadingHistoryItem[]> {
     try {
-      const data = await AsyncStorage.getItem(KEYS.READING_HISTORY);
+      const id = userId || await this.getCurrentUserId();
+      const key = getScopedKey(KEYS.READING_HISTORY, id);
+      const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting reading history:', error);
       return [];
     }
   },
 
-  // Thêm/cập nhật lịch sử đọc (LƯU NHIỀU CHƯƠNG)
-  async addToReadingHistory(item: ReadingHistoryItem): Promise<void> {
+  async getLifetimeStats(userId?: string): Promise<LifetimeStats> {
     try {
-      const history = await this.getReadingHistory();
-      
-      // Tìm entry có cùng storyId VÀ chapterNumber
+      const id = userId || await this.getCurrentUserId();
+      const key = getScopedKey(KEYS.LIFETIME_STATS, id);
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : { totalChaptersRead: 0 };
+    } catch (error) {
+      return { totalChaptersRead: 0 };
+    }
+  },
+
+  // Thêm/cập nhật lịch sử đọc (LƯU NHIỀU CHƯƠNG)
+  async addToReadingHistory(item: ReadingHistoryItem, userId?: string): Promise<void> {
+    try {
+      const id = userId || await this.getCurrentUserId();
+      const history = await this.getReadingHistory(id);
+
       const existingIndex = history.findIndex(
         h => h.storyId === item.storyId && h.lastReadChapter === item.lastReadChapter
       );
-      
+
       if (existingIndex !== -1) {
-        // Nếu đã tồn tại entry này, chỉ cập nhật thời gian đọc
         history[existingIndex].lastReadAt = item.lastReadAt;
-        history[existingIndex].storyTitle = item.storyTitle;
-        history[existingIndex].thumbnailUrl = item.thumbnailUrl;
-        history[existingIndex].authorName = item.authorName;
       } else {
-        // Nếu chưa có, thêm entry mới vào đầu
         history.unshift(item);
+        await this.incrementLifetimeChapters(id);
       }
-      
-      // Sắp xếp theo thời gian đọc mới nhất
-      history.sort((a, b) => 
-        new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime()
-      );
-      
-      // Giới hạn tổng số entry (ví dụ: 200 entry = ~40 truyện x 5 chương/truyện)
+
       const limitedHistory = history.slice(0, 200);
-      
-      await AsyncStorage.setItem(KEYS.READING_HISTORY, JSON.stringify(limitedHistory));
+      const key = getScopedKey(KEYS.READING_HISTORY, id);
+      await AsyncStorage.setItem(key, JSON.stringify(limitedHistory));
     } catch (error) {
       console.error('Error adding to reading history:', error);
+    }
+  },
+
+  async incrementLifetimeChapters(userId?: string): Promise<void> {
+    try {
+      const id = userId || await this.getCurrentUserId();
+      const stats = await this.getLifetimeStats(id);
+      stats.totalChaptersRead += 1;
+      const key = getScopedKey(KEYS.LIFETIME_STATS, id);
+      await AsyncStorage.setItem(key, JSON.stringify(stats));
+    } catch (error) {
+      console.error('Error incrementing stats:', error);
     }
   },
 
@@ -98,11 +127,13 @@ export const storageService = {
   },
 
   // Xóa toàn bộ lịch sử
-  async clearReadingHistory(): Promise<void> {
+  async clearReadingHistory(userId?: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(KEYS.READING_HISTORY);
+      const id = userId || await this.getCurrentUserId();
+      const key = getScopedKey(KEYS.READING_HISTORY, id);
+      await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error clearing reading history:', error);
+      console.error('Error clearing history:', error);
     }
   },
 
@@ -114,7 +145,7 @@ export const storageService = {
         .filter(h => h.storyId === storyId)
         .map(h => h.lastReadChapter)
         .sort((a, b) => a - b); // Sắp xếp tăng dần
-      
+
       // Loại bỏ trùng lặp (nếu có)
       return [...new Set(chapters)];
     } catch (error) {
@@ -129,10 +160,10 @@ export const storageService = {
       const history = await this.getReadingHistory();
       const storyEntries = history
         .filter(h => h.storyId === storyId)
-        .sort((a, b) => 
+        .sort((a, b) =>
           new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime()
         );
-      
+
       return storyEntries.length > 0 ? storyEntries[0].lastReadChapter : null;
     } catch (error) {
       console.error('Error getting last read chapter:', error);
@@ -145,23 +176,26 @@ export const storageService = {
   // ============================================
 
   // Lấy danh sách yêu thích
-  async getFavorites(): Promise<number[]> {
+  async getFavorites(userId?: string): Promise<number[]> {
     try {
-      const data = await AsyncStorage.getItem(KEYS.FAVORITES);
+      const id = userId || await this.getCurrentUserId();
+      const key = getScopedKey(KEYS.FAVORITES, id);
+      const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting favorites:', error);
       return [];
     }
   },
 
   // Thêm vào yêu thích
-  async addToFavorites(storyId: number): Promise<void> {
+  async addToFavorites(storyId: number, userId?: string): Promise<void> {
     try {
-      const favorites = await this.getFavorites();
+      const id = userId || await this.getCurrentUserId();
+      const favorites = await this.getFavorites(id);
       if (!favorites.includes(storyId)) {
         favorites.push(storyId);
-        await AsyncStorage.setItem(KEYS.FAVORITES, JSON.stringify(favorites));
+        const key = getScopedKey(KEYS.FAVORITES, id);
+        await AsyncStorage.setItem(key, JSON.stringify(favorites));
       }
     } catch (error) {
       console.error('Error adding to favorites:', error);
@@ -228,13 +262,13 @@ export const storageService = {
   }> {
     try {
       const history = await this.getReadingHistory();
-      
+
       // Đếm số truyện duy nhất
       const uniqueStories = new Set(history.map(h => h.storyId));
-      
+
       // Lấy 10 entry gần nhất
       const recentStories = history.slice(0, 10);
-      
+
       return {
         totalStoriesRead: uniqueStories.size,
         totalChaptersRead: history.length,

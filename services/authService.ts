@@ -13,7 +13,6 @@ export const authService = {
   login: async (data: LoginRequest) => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
     
-    // Save user info to AsyncStorage
     if (response.data) {
       await authService.saveUser(response.data);
     }
@@ -27,8 +26,8 @@ export const authService = {
   // Đăng xuất
   logout: async () => {
     try {
-      await AsyncStorage.removeItem('@user'); // Key bạn dùng để lưu thông tin user
-      await AsyncStorage.removeItem('@auth_token'); // Xóa token nếu có
+      await AsyncStorage.removeItem('@user');
+      await AsyncStorage.removeItem('@auth_token');
       console.log("Đã xóa dữ liệu user trong Storage");
     } catch (error) {
       console.error('Lỗi khi đăng xuất:', error);
@@ -59,5 +58,24 @@ export const authService = {
   isAuthenticated: async (): Promise<boolean> => {
     const user = await authService.getStoredUser();
     return user !== null;
+  },
+
+  // ============ CHỨC NĂNG QUÊN MẬT KHẨU (OTP) ============
+
+  // Bước 1: Gửi OTP qua email
+  sendOtp: async (username: string, email: string) => {
+    return apiClient.post('/auth/send-otp', { username, email });
+  },
+
+  // Bước 2: Xác thực OTP và đặt lại mật khẩu
+  verifyOtpAndResetPassword: async (username: string, otp: string, newPassword: string) => {
+    return apiClient.post('/auth/verify-otp-reset', { username, otp, newPassword });
+  },
+
+  // (Optional) Kiểm tra thời gian còn lại của OTP
+  getOtpRemainingTime: async (username: string) => {
+    return apiClient.get<{ remainingSeconds: number; isValid: boolean }>(
+      `/auth/otp-remaining-time?username=${username}`
+    );
   },
 };

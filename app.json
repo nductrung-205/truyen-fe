@@ -8,6 +8,9 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "extra": {
+      "geminiApiKey": "AIzaSyD24utN6B7B9hLQN6XtPxrN5Ew-2Jc15mw"
+    },
     "ios": {
       "supportsTablet": true
     },

@@ -3,23 +3,28 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { Chatbot } from '@/components/Chatbot';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-// Component wrapper để sử dụng theme
 function RootLayoutNav() {
   const { isDarkMode } = useTheme();
 
   return (
-    <NavigationThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-    </NavigationThemeProvider>
+    <>
+      <NavigationThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      </NavigationThemeProvider>
+      
+      {/* Chatbot xuất hiện trên tất cả màn hình */}
+      <Chatbot />
+    </>
   );
 }
 
