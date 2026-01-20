@@ -6,28 +6,49 @@ const AUTH_TOKEN_KEY = '@auth_token';
 const USER_KEY = '@user';
 
 export const authService = {
-  // Đăng ký
-  register: (data: RegisterRequest) => apiClient.post('/auth/register', data),
+  // ============ ĐĂNG KÝ (2 BƯỚC) ============
 
-  // Đăng nhập
+  // Bước 1: Gửi OTP để đăng ký tài khoản mới
+  sendRegistrationOtp: async (email: string) => {
+    return apiClient.post('/auth/register/send-otp', { email });
+  },
+
+  // Bước 2: Hoàn tất đăng ký (Xác thực OTP + Password)
+  register: (data: RegisterRequest) => {
+    return apiClient.post('/auth/register', data);
+  },
+
+  // ============ ĐĂNG NHẬP ============
+
   login: async (data: LoginRequest) => {
     const response = await apiClient.post<AuthResponse>('/auth/login', data);
-    
     if (response.data) {
       await authService.saveUser(response.data);
     }
-    
     return response;
   },
 
-  // Lấy thông tin user hiện tại
+  // ============ QUÊN MẬT KHẨU (2 BƯỚC) ============
+
+  // Bước 1: Gửi OTP khôi phục mật khẩu
+  sendForgotPasswordOtp: async (email: string) => {
+    return apiClient.post('/auth/forgot-password/send-otp', { email });
+  },
+
+  // Bước 2: Xác thực OTP và đặt lại mật khẩu mới
+  resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
+    return apiClient.post('/auth/forgot-password/reset', data);
+  },
+
+  // ============ THÔNG TIN NGƯỜI DÙNG ============
+
+  // Lấy thông tin user hiện tại từ Server
   getCurrentUser: (userId: number) => apiClient.get(`/auth/me/${userId}`),
 
   // Đăng xuất
   logout: async () => {
     try {
-      await AsyncStorage.removeItem('@user');
-      await AsyncStorage.removeItem('@auth_token');
+      await AsyncStorage.multiRemove([USER_KEY, AUTH_TOKEN_KEY]);
       console.log("Đã xóa dữ liệu user trong Storage");
     } catch (error) {
       console.error('Lỗi khi đăng xuất:', error);
@@ -54,28 +75,19 @@ export const authService = {
     }
   },
 
-  // Check xem đã đăng nhập chưa
+  // Kiểm tra trạng thái đăng nhập
   isAuthenticated: async (): Promise<boolean> => {
     const user = await authService.getStoredUser();
     return user !== null;
   },
 
-  // ============ CHỨC NĂNG QUÊN MẬT KHẨU (OTP) ============
+  // ============ TIỆN ÍCH ============
 
-  // Bước 1: Gửi OTP qua email
-  sendOtp: async (username: string, email: string) => {
-    return apiClient.post('/auth/send-otp', { username, email });
-  },
-
-  // Bước 2: Xác thực OTP và đặt lại mật khẩu
-  verifyOtpAndResetPassword: async (username: string, otp: string, newPassword: string) => {
-    return apiClient.post('/auth/verify-otp-reset', { username, otp, newPassword });
-  },
-
-  // (Optional) Kiểm tra thời gian còn lại của OTP
-  getOtpRemainingTime: async (username: string) => {
+  // Kiểm tra thời gian còn lại của OTP (Sử dụng email làm param)
+  getOtpRemainingTime: async (email: string) => {
     return apiClient.get<{ remainingSeconds: number; isValid: boolean }>(
-      `/auth/otp-remaining-time?username=${username}`
+      `/auth/otp-remaining-time`, 
+      { params: { email } } // Truyền ?email=...
     );
   },
 };

@@ -101,6 +101,19 @@ export default function StoryDetailScreen() {
     router.push(`/chapter/${story.id}/${num}`);
   };
 
+  const renderRating = (rating: number) => {
+    return (
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingText}>{rating.toFixed(1)} </Text>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Text key={star} style={{ color: star <= rating ? '#FFD700' : '#CCC', fontSize: 16 }}>
+            ★
+          </Text>
+        ))}
+      </View>
+    );
+  };
+
   if (loading) return <LoadingSpinner text="Đang tải..." />;
   if (!story) return null;
 
@@ -124,6 +137,7 @@ export default function StoryDetailScreen() {
 
           <View style={styles.infoContainer}>
             <Text style={styles.title}>{story.title}</Text>
+            {renderRating(story.rating || 0)}
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>✍️ {story.authorName}</Text>
               <Text style={styles.metaText}>👁 {story.views} lượt xem</Text>
@@ -143,8 +157,22 @@ export default function StoryDetailScreen() {
 
           <View style={styles.chaptersContainer}>
             <Text style={[styles.sectionTitle, { paddingHorizontal: 16 }]}>📚 Danh sách chương</Text>
+            
             {displayedChapters.map((ch) => (
-              <ChapterItem key={ch.id} chapter={ch} onPress={() => handleReadChapter(ch.chapterNumber)} />
+              <TouchableOpacity 
+                key={ch.id} 
+                style={styles.chapterItemRow} 
+                onPress={() => handleReadChapter(ch.chapterNumber)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.chapterItemTitle}>Chương {ch.chapterNumber}: {ch.title}</Text>
+                  <Text style={styles.chapterItemSub}>📅 {new Date(ch.updatedAt).toLocaleDateString('vi-VN')}</Text>
+                </View>
+                {/* HIỂN THỊ VIEW RIÊNG CỦA TỪNG CHƯƠNG */}
+                <View style={styles.chapterViewBadge}>
+                   <Text style={styles.chapterViewText}>👁 {ch.views}</Text>
+                </View>
+              </TouchableOpacity>
             ))}
             {chapters.length > 10 && !showAllChapters && (
               <TouchableOpacity style={styles.showMoreButton} onPress={() => setShowAllChapters(true)}>
@@ -169,6 +197,7 @@ export default function StoryDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  
   container: { flex: 1, backgroundColor: '#fff' },
   scrollView: { flex: 1 },
   coverContainer: { height: 280, position: 'relative' },
@@ -193,5 +222,43 @@ const styles = StyleSheet.create({
   showMoreText: { color: '#007AFF', fontWeight: '600' },
   bottomActions: { flexDirection: 'row', padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee', gap: 10 },
   readButton: { flex: 1, backgroundColor: '#007AFF', padding: 14, borderRadius: 12, alignItems: 'center' },
-  readButtonText: { color: '#fff', fontWeight: '700' }
+  readButtonText: { color: '#fff', fontWeight: '700' },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ratingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFA500',
+  },
+  chapterItemRow: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    alignItems: 'center',
+    backgroundColor: '#fff'
+  },
+  chapterItemTitle: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500'
+  },
+  chapterItemSub: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4
+  },
+  chapterViewBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  chapterViewText: {
+    fontSize: 11,
+    color: '#666'
+  }
 });

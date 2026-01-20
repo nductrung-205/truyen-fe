@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -28,6 +29,8 @@ export const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -39,6 +42,8 @@ export const Chatbot = () => {
     textSecondary: isDarkMode ? '#a0a0a0' : '#666666',
     userBubble: '#3b82f6',
     assistantBubble: isDarkMode ? '#2d2d2d' : '#e5e5e5',
+    suggestionBg: isDarkMode ? '#2d2d2d' : '#f0f0f0',
+    border: isDarkMode ? '#3a3a3a' : '#e0e0e0',
   };
 
   useEffect(() => {
@@ -47,25 +52,40 @@ export const Chatbot = () => {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  useEffect(() => {
+    // Load quick suggestions khi mở chatbot
+    if (isOpen && messages.length === 0) {
+      loadSuggestions();
+    }
+  }, [isOpen]);
+
+  const loadSuggestions = async () => {
+    try {
+      const quickSuggestions = await chatbotService.getQuickSuggestions();
+      setSuggestions(quickSuggestions);
+    } catch (error) {
+      console.error('Error loading suggestions:', error);
+    }
+  };
+
+  const handleSend = async (messageText?: string) => {
+    const textToSend = messageText || input.trim();
+    if (!textToSend || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: textToSend,
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setShowSuggestions(false);
 
     try {
-      const response = await chatbotService.chat(
-        userMessage.content,
-        'Bạn là trợ lý AI cho ứng dụng đọc truyện. Hãy gợi ý truyện hay, trả lời câu hỏi về truyện, và hỗ trợ người dùng một cách thân thiện.'
-      );
+      const response = await chatbotService.chat(textToSend);
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -75,18 +95,31 @@ export const Chatbot = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.',
+        content: error?.message || 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSuggestionPress = (suggestion: string) => {
+    // Remove emoji và gửi
+    const cleanText = suggestion.replace(/[📚🔥🔍❤️📖✨💫]/g, '').trim();
+    handleSend(cleanText);
+  };
+
+  const handleReset = () => {
+    setMessages([]);
+    setShowSuggestions(true);
+    chatbotService.resetConversation();
+    loadSuggestions();
   };
 
   const animateButton = () => {
@@ -127,10 +160,22 @@ export const Chatbot = () => {
             style={{
               color: isUser ? '#ffffff' : colors.text,
               fontSize: 15,
-              lineHeight: 20,
+              lineHeight: 22,
             }}
           >
             {item.content}
+          </Text>
+          <Text
+            style={{
+              color: isUser ? 'rgba(255,255,255,0.7)' : colors.textSecondary,
+              fontSize: 11,
+              marginTop: 4,
+            }}
+          >
+            {item.timestamp.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
           </Text>
         </View>
       </View>
@@ -140,12 +185,51 @@ export const Chatbot = () => {
   const renderEmptyState = () => (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
-      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600', marginTop: 16 }}>
+      <Text style={{ color: colors.text, fontSize: 20, fontWeight: '600', marginTop: 16 }}>
         Xin chào! 👋
       </Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 14, marginTop: 8, textAlign: 'center' }}>
-        Tôi là trợ lý AI. Hỏi tôi về truyện, gợi ý đọc truyện, hoặc bất cứ điều gì bạn cần!
+      <Text style={{ 
+        color: colors.textSecondary, 
+        fontSize: 14, 
+        marginTop: 8, 
+        textAlign: 'center',
+        lineHeight: 20,
+      }}>
+        Tôi là trợ lý AI của bạn.{'\n'}
+        Hãy hỏi tôi về truyện, gợi ý đọc truyện hoặc bất cứ điều gì!
       </Text>
+      
+      {/* Quick suggestions */}
+      {showSuggestions && suggestions.length > 0 && (
+        <View style={{ marginTop: 24, width: '100%' }}>
+          <Text style={{ 
+            color: colors.text, 
+            fontSize: 13, 
+            fontWeight: '600', 
+            marginBottom: 12 
+          }}>
+            💡 Gợi ý nhanh:
+          </Text>
+          {suggestions.map((suggestion, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => handleSuggestionPress(suggestion)}
+              style={{
+                backgroundColor: colors.suggestionBg,
+                padding: 12,
+                borderRadius: 12,
+                marginBottom: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 14 }}>
+                {suggestion}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 
@@ -181,6 +265,24 @@ export const Chatbot = () => {
           }}
         >
           <Ionicons name="chatbubble-ellipses" size={28} color="#ffffff" />
+          {/* Badge for new messages indicator */}
+          <View
+            style={{
+              position: 'absolute',
+              top: -2,
+              right: -2,
+              width: 20,
+              height: 20,
+              borderRadius: 10,
+              backgroundColor: '#ef4444',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold' }}>
+              AI
+            </Text>
+          </View>
         </TouchableOpacity>
       </Animated.View>
 
@@ -205,17 +307,34 @@ export const Chatbot = () => {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
+              elevation: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="chatbubbles" size={24} color="#ffffff" />
-              <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600', marginLeft: 12 }}>
-                Trợ lý AI
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Ionicons name="sparkles" size={24} color="#ffffff" />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600' }}>
+                  Trợ lý AI
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
+                  Hỗ trợ tìm truyện & gợi ý
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => setIsOpen(false)}>
-              <Ionicons name="close" size={28} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {messages.length > 0 && (
+                <TouchableOpacity onPress={handleReset}>
+                  <Ionicons name="refresh" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setIsOpen(false)}>
+                <Ionicons name="close" size={28} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Messages */}
@@ -244,7 +363,9 @@ export const Chatbot = () => {
                   }}
                 >
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={{ color: colors.textSecondary, marginLeft: 8 }}>Đang trả lời...</Text>
+                  <Text style={{ color: colors.textSecondary, marginLeft: 8 }}>
+                    Đang suy nghĩ...
+                  </Text>
                 </View>
               </View>
             )}
@@ -256,14 +377,14 @@ export const Chatbot = () => {
               padding: 12,
               backgroundColor: colors.surface,
               borderTopWidth: 1,
-              borderTopColor: isDarkMode ? '#3a3a3a' : '#e0e0e0',
+              borderTopColor: colors.border,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
               <TextInput
                 value={input}
                 onChangeText={setInput}
-                placeholder="Nhập tin nhắn..."
+                placeholder="Hỏi về truyện, gợi ý, tác giả..."
                 placeholderTextColor={colors.textSecondary}
                 style={{
                   flex: 1,
@@ -275,14 +396,16 @@ export const Chatbot = () => {
                   color: colors.text,
                   marginRight: 8,
                   borderWidth: 1,
-                  borderColor: isDarkMode ? '#3a3a3a' : '#e0e0e0',
+                  borderColor: colors.border,
+                  maxHeight: 100,
                 }}
                 multiline
                 maxLength={500}
                 editable={!isLoading}
+                onSubmitEditing={() => handleSend()}
               />
               <TouchableOpacity
-                onPress={handleSend}
+                onPress={() => handleSend()}
                 disabled={!input.trim() || isLoading}
                 style={{
                   width: 44,
@@ -293,9 +416,21 @@ export const Chatbot = () => {
                   alignItems: 'center',
                 }}
               >
-                <Ionicons name="send" size={20} color="#ffffff" />
+                <Ionicons 
+                  name={isLoading ? "hourglass-outline" : "send"} 
+                  size={20} 
+                  color="#ffffff" 
+                />
               </TouchableOpacity>
             </View>
+            <Text style={{ 
+              color: colors.textSecondary, 
+              fontSize: 11, 
+              marginTop: 6,
+              textAlign: 'center' 
+            }}>
+              AI có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.
+            </Text>
           </View>
         </KeyboardAvoidingView>
       </Modal>

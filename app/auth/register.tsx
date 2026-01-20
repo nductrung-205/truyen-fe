@@ -1,279 +1,196 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  ScrollView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, Alert
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { authService } from '@/services/authService';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState(''); // Thêm state cho OTP
   const [loading, setLoading] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(false); // Trạng thái đã gửi mã hay chưa
+  
+  const [status, setStatus] = useState({ msg: '', isError: false });
 
-  const showAlert = (title: string, message: string, onPress?: () => void) => {
-    if (Platform.OS === 'web') {
-      alert(`${title}: ${message}`);
-      if (onPress) onPress();
-    } else {
-      Alert.alert(title, message, onPress ? [{ text: 'OK', onPress }] : []);
-    }
-  };
-
-  const handleRegister = async () => {
-    console.log(">>> Bắt đầu Validation...");
-
-    if (!username.trim() || !email.trim() || !password || !confirmPassword) {
-      console.log("Lỗi: Thiếu thông tin", { username, email });
-      showAlert('Lỗi', 'Vui lòng nhập đầy đủ thông tin (Đặc biệt là Email)');
+  // Bước 1: Gửi mã OTP
+  const handleSendOtp = async () => {
+    if (!email.includes('@')) {
+      setStatus({ msg: 'Email không hợp lệ', isError: true });
       return;
     }
-
-    if (username.trim().length < 3) {
-      showAlert('Lỗi', 'Tên đăng nhập phải có ít nhất 3 ký tự');
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      showAlert('Lỗi', 'Email không hợp lệ');
-      return;
-    }
-
     if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      setStatus({ msg: 'Mật khẩu phải từ 6 ký tự', isError: true });
       return;
     }
 
     try {
       setLoading(true);
-      console.log(">>> Đang gửi request lên Server...");
-      const response = await authService.register({
-        username: username.trim(),
+      setStatus({ msg: '', isError: false });
+      // Gọi API: /api/auth/register/send-otp
+      await authService.sendRegistrationOtp(email.trim());
+      
+      setIsOtpSent(true);
+      setStatus({ msg: 'Mã xác thực đã được gửi đến email của bạn!', isError: false });
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Không thể gửi mã OTP. Email có thể đã tồn tại.';
+      setStatus({ msg: errorMsg, isError: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Bước 2: Xác nhận OTP và Đăng ký
+  const handleFinalRegister = async () => {
+    if (!otp) {
+      setStatus({ msg: 'Vui lòng nhập mã OTP', isError: true });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatus({ msg: '', isError: false });
+      // Gọi API: /api/auth/register (truyền email, otp, password)
+      await authService.register({
         email: email.trim(),
-        password,
+        password: password,
+        otp: otp.trim()
       });
 
-      showAlert('Thành công', 'Đăng ký thành công! Vui lòng đăng nhập.', () => {
-        router.back();
-      });
+      setStatus({ msg: 'Đăng ký thành công! Đang chuyển hướng...', isError: false });
+      setTimeout(() => router.replace('/auth/login'), 2000);
     } catch (error: any) {
-      console.error('Register error:', error);
-      const errorMsg = error.response?.data || 'Có lỗi xảy ra. Vui lòng thử lại.';
-      showAlert('Đăng ký thất bại', errorMsg);
+      const errorMsg = error.response?.data?.message || 'Mã xác thực không đúng hoặc đã hết hạn';
+      setStatus({ msg: errorMsg, isError: true });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-            {/* Header */}
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.backButtonText}>‹ Quay lại</Text>
-            </TouchableOpacity>
+    <View style={styles.container}>
+      <Stack.Screen options={{ title: 'Tạo tài khoản', headerShown: true }} />
 
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoIcon}>📚</Text>
-              <Text style={styles.logoText}>Tạo Tài Khoản</Text>
-              <Text style={styles.subtitle}>Đăng ký để bắt đầu đọc truyện</Text>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Tên đăng nhập *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Tối thiểu 3 ký tự"
-                  value={username}
-                  onChangeText={setUsername}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder=""
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Mật khẩu *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Tối thiểu 6 ký tự"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Xác nhận mật khẩu *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập lại mật khẩu"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.registerButton}
-                onPress={handleRegister}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.registerButtonText}>Đăng ký</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.termsContainer}>
-                <Text style={styles.termsText}>
-                  Bằng việc đăng ký, bạn đã đồng ý với{' '}
-                  <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
-                  <Text style={styles.termsLink}>Chính sách bảo mật</Text> của
-                  chúng tôi
-                </Text>
-              </View>
-            </View>
+      <View style={styles.form}>
+        {status.msg ? (
+          <View style={[styles.statusBox, status.isError ? styles.errBg : styles.succBg]}>
+            <Text style={[styles.statusText, { color: status.isError ? '#E53E3E' : '#38A169' }]}>
+              {status.msg}
+            </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </>
+        ) : null}
+
+        {/* Input Email - Khóa khi đã gửi OTP */}
+        <View style={[styles.inputWrapper, isOtpSent && { opacity: 0.6 }]}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email của bạn"
+            value={email}
+            onChangeText={(t) => { setEmail(t); setStatus({msg:'', isError:false}); }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!isOtpSent}
+          />
+        </View>
+
+        {/* Input Password - Khóa khi đã gửi OTP */}
+        <View style={[styles.inputWrapper, isOtpSent && { opacity: 0.6 }]}>
+          <TextInput
+            style={styles.input}
+            placeholder="Mật khẩu"
+            value={password}
+            onChangeText={(t) => { setPassword(t); setStatus({msg:'', isError:false}); }}
+            secureTextEntry
+            editable={!isOtpSent}
+          />
+        </View>
+
+        {/* Hiện input OTP sau khi bấm Gửi mã */}
+        {isOtpSent && (
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập mã OTP gồm 6 số"
+              value={otp}
+              onChangeText={setOtp}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+          </View>
+        )}
+
+        {/* Nút bấm thay đổi theo bước */}
+        {!isOtpSent ? (
+          <TouchableOpacity style={styles.registerBtn} onPress={handleSendOtp} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerBtnText}>Gửi mã xác thực</Text>}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.registerBtn, {backgroundColor: '#38A169'}]} onPress={handleFinalRegister} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerBtnText}>Xác nhận Đăng ký</Text>}
+          </TouchableOpacity>
+        )}
+
+        {isOtpSent && (
+          <TouchableOpacity onPress={() => setIsOtpSent(false)} style={{marginTop: 15, alignItems: 'center'}}>
+            <Text style={{color: '#6BB5FF'}}>Thay đổi Email</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.policyContainer}>
+          <Text style={styles.policyText}>
+            <Text>Tôi đã đọc và đồng ý với </Text>
+            <Text style={styles.link}>Chính Sách Bảo Mật</Text> 
+            <Text> và </Text>
+            <Text style={styles.link}>Thỏa thuận người dùng</Text>
+          </Text>
+        </View>
+
+        {/* THÊM NÚT QUAY LẠI ĐĂNG NHẬP */}
+        <TouchableOpacity 
+          onPress={() => router.push('/auth/login')}
+          style={{ marginTop: 20 }}
+        >
+          <Text style={{ textAlign: 'center', color: '#6BB5FF', fontSize: 15 }}>
+            Đã có tài khoản? <Text style={{ fontWeight: 'bold' }}>Đăng nhập</Text>
+          </Text>
+        </TouchableOpacity>
+
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-  },
-  backButton: {
-    marginBottom: 24,
-  },
-  backButtonText: {
-    fontSize: 18,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  form: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
+  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
+  form: { marginTop: 20 },
+  statusBox: { padding: 15, borderRadius: 12, marginBottom: 20, alignItems: 'center' },
+  errBg: { backgroundColor: '#FFF5F5' },
+  succBg: { backgroundColor: '#F0FFF4' },
+  statusText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  inputWrapper: {
+    backgroundColor: '#F5F6F8',
+    borderRadius: 25,
+    marginBottom: 15,
+    paddingHorizontal: 20,
+    height: 55,
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#F8F9FA',
+    borderColor: '#EFEFEF'
   },
-  registerButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
+  input: { fontSize: 15, color: '#333' },
+  registerBtn: {
+    backgroundColor: '#6BB5FF',
+    height: 55,
+    borderRadius: 27.5,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10
   },
-  registerButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  termsContainer: {
-    marginTop: 16,
-  },
-  termsText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  termsLink: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+  registerBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  policyContainer: { marginTop: 30, paddingHorizontal: 10 },
+  policyText: { fontSize: 12, color: '#999', textAlign: 'center', lineHeight: 20 },
+  link: { color: '#6BB5FF' }
 });

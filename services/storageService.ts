@@ -239,9 +239,21 @@ export const storageService = {
   },
 
   // Lấy tiến độ đọc
-  async getReadingProgress(storyId: number, chapterNumber: number): Promise<ReadingProgress | null> {
+  async getReadingProgress(storyId: number, chapterNumber?: number): Promise<ReadingProgress | null> {
     try {
-      const key = `${KEYS.READING_PROGRESS}_${storyId}_${chapterNumber}`;
+      let targetChapter = chapterNumber;
+
+      // Nếu không truyền chapterNumber, hãy thử tìm chương đọc gần nhất từ lịch sử
+      if (targetChapter === undefined) {
+        const lastRead = await this.getLastReadChapter(storyId);
+        if (lastRead) {
+          targetChapter = lastRead;
+        } else {
+          return null; // Không có lịch sử, không có tiến độ
+        }
+      }
+
+      const key = `${KEYS.READING_PROGRESS}_${storyId}_${targetChapter}`;
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {

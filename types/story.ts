@@ -54,3 +54,14 @@ export interface PaginatedStories {
   totalItems: number;
   totalPages: number;
 }
+
+export interface StoryResponse {
+  stories: Story[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+}
+
+export interface ApiResponse {
+  data: StoryResponse | Story[]; // Vì có chỗ bạn dùng response.data.stories, có chỗ dùng response.data trực tiếp
+}
