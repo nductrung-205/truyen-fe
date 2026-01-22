@@ -6,6 +6,8 @@ export interface Chapter {
   views: number;
   createdAt: string;
   updatedAt: string;
+  isVip: boolean;
+  price:number;
 }
 
 // DTO cho chi tiết chapter (có nội dung)

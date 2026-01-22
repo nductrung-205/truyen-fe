@@ -1,9 +1,8 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Đổi thành IP máy thật khi test trên điện thoại
-// Ví dụ: 'http://192.168.1.100:8080/api'
-// const API_BASE_URL = 'http://localhost:8080/api';
-const API_BASE_URL = 'http://192.168.1.8:8080/api';
+const API_BASE_URL = 'http://192.168.1.14:8080/api';
+const USER_KEY = '@user';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -13,11 +12,29 @@ export const apiClient = axios.create({
   },
 });
 
-// Có thể thêm interceptor để xử lý lỗi chung
+// ✅ Interceptor: Gửi username thay vì token
+apiClient.interceptors.request.use(
+  async (config) => {
+    try {
+      const userData = await AsyncStorage.getItem(USER_KEY);
+      if (userData) {
+        const user = JSON.parse(userData);
+        // Gửi username qua header
+        config.headers['X-User'] = user.username;
+      }
+    } catch (error) {
+      console.error('Error getting user:', error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Xử lý lỗi chung ở đây
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }

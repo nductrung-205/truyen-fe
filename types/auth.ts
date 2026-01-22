@@ -23,6 +23,10 @@ export interface AuthResponse {
   avatarUrl: string;
   role: string;
   message?: string;
+  coins: number;
+  exp: number;
+  // ✅ Token là optional vì không dùng nữa
+  token?: string;
 }
 
 export interface UserProfile {
@@ -31,4 +35,10 @@ export interface UserProfile {
   email: string;
   avatarUrl: string;
   role: string;
+  checkInStreak?: number;
+  lastCheckIn?: string;
+  exp?: number;
+  coins?: number;
+  // ✅ Token là optional
+  token?: string;
 }

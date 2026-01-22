@@ -22,18 +22,18 @@ export interface StoryDetail {
   views: number;
   rating: number;
   chaptersCount: number;
-  
+
   // Thông tin tác giả
   authorId: number;
   authorName: string;
   authorAvatarUrl: string;
-  
+
   // Danh sách thể loại
   categoryNames: string[];
-  
+
   // Danh sách chapter (tóm tắt)
   chapters: ChapterSummary[];
-  
+
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +45,15 @@ export interface ChapterSummary {
   title: string;
   views: number;
   updatedAt: string;
+  isVip: boolean;  // Thêm
+  price: number;
+}
+
+export interface ChapterDetail extends ChapterSummary {
+  content: string;
+  locked: boolean; // Trả về từ API nếu chưa mua
+  previousChapter: number | null;
+  nextChapter: number | null;
 }
 
 // Response phân trang từ API
