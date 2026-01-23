@@ -81,15 +81,27 @@ export default function DepositScreen() {
 
   // Hàm xử lý cho APP
   const handleDeepLink = (event: { url: string }) => {
-    let { queryParams } = Linking.parse(event.url);
-    if (event.url.includes('payment-status') || event.url.includes('deposit')) {
-      if (Platform.OS !== 'web') WebBrowser.dismissBrowser();
+    console.log("Deep Link nhận được:", event.url);
+
+    // Parse URL để lấy query params
+    let { path, queryParams } = Linking.parse(event.url);
+
+    // Kiểm tra nếu path là 'payment-status' (như backend mình đã setup)
+    if (path === 'payment-status' || event.url.includes('payment-status')) {
+
+      // Đóng trình duyệt ngay lập tức trên Mobile
+      if (Platform.OS !== 'web') {
+        WebBrowser.dismissBrowser();
+      }
 
       const result = queryParams?.result;
       if (result) {
         setPaymentStatus(result === 'success' ? 'success' : 'failed');
         setModalVisible(true);
-        if (result === 'success' && currentUser) refreshCoins(currentUser.id);
+
+        if (result === 'success' && currentUser) {
+          refreshCoins(currentUser.id);
+        }
       }
     }
   };
@@ -102,7 +114,8 @@ export default function DepositScreen() {
         params: {
           amount: selectedAmount,
           userId: currentUser.id,
-          bankCode: selectedBank
+          bankCode: selectedBank,
+          platform: Platform.OS === 'web' ? 'WEB' : 'APP'
         }
       });
 

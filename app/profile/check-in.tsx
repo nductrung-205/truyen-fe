@@ -150,7 +150,9 @@ export default function CheckInScreen() {
   }
 
   return (
+    
     <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
+      
       <StatusBar barStyle="light-content" />
       {message && (
         <View style={[
